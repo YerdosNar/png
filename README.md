@@ -42,6 +42,7 @@ gcc -O2 -o png png.c -lz -lm
 
 ### Options
 
+- `-i, --info` - Show information about the PNG file
 - `-o, --output <file>` - Output filename (default: out.png)
 - `-g, --grayscale` - Convert to grayscale
 - `-c, --color` - Keep RGB format (default)
