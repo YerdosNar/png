@@ -685,7 +685,7 @@ int main(int argc, char **argv) {
     }
     if(!output_file) {
         printf("No output filename was set\n");
-        printf("Default: out.png");
+        printf("Default: out.png\n");
         output_file = "out.png";
     }
 
