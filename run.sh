@@ -3,7 +3,7 @@
 set -xe
 
 CC=gcc
-FLAGS="-Wall -Wextra"
+FLAGS="-lz -lm -Wall -Wextra"
 $CC png.c -o png $FLAGS
 
 if [[ $# -eq 1 ]]; then
