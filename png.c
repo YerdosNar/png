@@ -458,7 +458,7 @@ void save_png(const char *filename, uint8_t **pixels,
     uint32_t width_be = htonl(width),
              height_be = htonl(height);
     memcpy(ihdr_data, &width_be, sizeof(width_be));
-    memcpy(ihdr_data, &height_be, sizeof(height_be));
+    memcpy(ihdr_data+4, &height_be, sizeof(height_be));
     ihdr_data[8] = 8;
     ihdr_data[9] = color_type; //colortype: 0-grayscale, 2-RGB
     ihdr_data[10] = 0; //compression method
@@ -523,6 +523,41 @@ void usage(char *exec_name) {
     printf("  %s photo.png -o blurred.png --gaussian\n", exec_name);
 }
 
+void print_info(FILE *file) {
+    uint8_t signature[PNG_SIG_SIZE];
+    read_bytes(file, signature, PNG_SIG_SIZE);
+    if(memcmp(signature, png_sig, PNG_SIG_SIZE) != 0) {
+        fprintf(stderr, "ERROR: is not a PNG file\n");
+        fclose(file);
+        exit(1);
+    }
+    printf("PNG Signature: ");
+    print_bytes(signature, PNG_SIG_SIZE);
+    printf("\n==== INFO ====\n");
+    
+    read_chunk_size(file);
+    uint8_t type[4];
+    read_chunk_type(file, type);
+    if(memcmp(type, "IHDR", 4) == 0) {
+        ihdr_t ihdr;
+        read_bytes(file, &ihdr.width, 4);
+        read_bytes(file, &ihdr.height, 4);
+        read_bytes(file, &ihdr.bit_depth, 1);
+        read_bytes(file, &ihdr.color_type, 1);
+        read_bytes(file, &ihdr.compression, 1);
+        read_bytes(file, &ihdr.filter, 1);
+        read_bytes(file, &ihdr.interlace, 1);
+
+        printf("Width:       %dpx\n", ntohl(ihdr.width));
+        printf("Height:      %dpx\n", ntohl(ihdr.height));
+        printf("Bit depth:   %u\n", ihdr.bit_depth);
+        printf("Color type:  %u\n", ihdr.color_type);
+        printf("Compression: %u\n", ihdr.compression);
+        printf("Filter:      %u\n", ihdr.filter);
+        printf("Interlace:   %u\n", ihdr.interlace);
+    }
+}
+
 int main(int argc, char **argv) {
     if(argc < 2) {
         usage(argv[0]);
@@ -540,6 +575,21 @@ int main(int argc, char **argv) {
     for(int i = 1; i < argc; i++) {
         if((strcmp(argv[i], "-h") == 0 || strcmp(argv[i], "--help") == 0) && i == 1) {
             usage(argv[0]);
+            return 0;
+        } else if(!strcmp(argv[i], "-i") || !strcmp(argv[i], "--info")) {
+            if(argc != 3) {
+                fprintf(stderr, "ERROR: Too many arguments for --info flag\n");
+                return 1;
+            }
+
+            if(!input_file) {
+                fprintf(stderr, "ERROR: Input file not provided for --info\n");
+                return 1;
+            }
+
+            FILE *file = fopen(input_file, "rb");
+            print_info(file);
+            fclose(file);
             return 0;
         } else if(!strcmp(argv[i], "-o") || !strcmp(argv[i], "--output")) {
             if(i + 1 < argc) {
@@ -587,7 +637,7 @@ int main(int argc, char **argv) {
                 conflict_kernel = true;
                 kernel = KERNEL_SOBEL_COMBINED;
             } else {
-        fprintf(stderr, "ERROR: Two or more kernels chosen\n");
+                fprintf(stderr, "ERROR: Two or more kernels chosen\n");
                 return 0;
             }
         } else if(!strcmp(argv[i], "--gaussian")) {
