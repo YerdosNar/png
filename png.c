@@ -518,8 +518,8 @@ void usage(char *exec_name) {
     printf("  --sobel-x              Apply Sobel X edge detection\n");
     printf("  --sobel-y              Apply Sobel Y edge detection\n");
     printf("  --sobel                Apply combined Sobel edge detection\n");
-    printf("  --gaussian             Apply Gaussian blur\n");
-    printf("  --blur [steps]         Apply box blur (optional: numberof iterations, default=0)\n");
+    printf("  --gaussian [steps]     Apply Gaussian blur (optional: number of iterations, default=1)\n");
+    printf("  --blur [steps]         Apply box blur (optional: number of iterations, default=1)\n");
     printf("  --laplacian            Apply Laplacian edge detection\n");
     printf("  --sharpen              Apply sharpening filter\n");
     printf("  --none                 No filter (default)\n");
@@ -527,6 +527,9 @@ void usage(char *exec_name) {
     printf("\nExamples:\n");
     printf("  %s input.png -o edges.png --sobel --grayscale\n", exec_name);
     printf("  %s photo.png -o blurred.png --gaussian\n", exec_name);
+
+    printf("\n\n");
+    printf("Author: YerdosNar github.com/YerdosNar/png.git\n");
 }
 
 void print_info(FILE *file) {
@@ -686,6 +689,9 @@ int main(int argc, char **argv) {
             if(!conflict_kernel) {
                 conflict_kernel = true;
                 kernel = KERNEL_GAUSSIAN;
+                if(i + 1 < argc && argv[i+1][0] >= '0' && argv[i+1][0] <= '9') {
+                    steps = (uint8_t)(strtol(argv[++i], NULL, 10));
+                }
             } else {
                 fprintf(stderr, "ERROR: Two or more kernels chosen\n");
                 return 1;
