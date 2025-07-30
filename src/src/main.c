@@ -1,6 +1,6 @@
-#include "png_io.h"
-#include "utils.h"
-#include "image.h"
+#include "../include/png_io.h"
+#include "../include/utils.h"
+#include "../include/image.h"
 
 void usage(char *exec_name) {
     printf("Usage: %s <input.png> -o <output.png> [options]\n", exec_name);
@@ -27,6 +27,25 @@ void usage(char *exec_name) {
 }
 
 int main(int argc, char **argv) {
+    if(argc < 2) {
+        usage(argv[0]);
+        return 1;
+    }
+
+    char *input_file = NULL;
+    char *output_file = NULL;
+    bool force_grayscale = false;
+    bool conflict_color = false;
+    bool conflict_kernel = false;
+    kernel_type kernel = KERNEL_NONE;
+    uint16_t steps = 0;
+
+    for(int i = 1; i < argc; i++) {
+        if((!strcmp(argv[i], "-h") || !strcmp(argv[i], "--help")) && i == 1) {
+            usage(argv[0]);
+            return 0;
+        }
+        else if()
     
     return 0;
 }

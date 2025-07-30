@@ -50,7 +50,7 @@ void read_bytes(FILE *file, void *buffer, size_t buffer_size) {
         } else if(feof(file)) {
             fprintf(stderr, "ERROR: could not read %zu bytes from file: reached EOF %s\n", buffer_size, strerror(errno));
             exit(1);
-} else {
+        } else {
             assert(0 && "unreachable");
         }
     }
