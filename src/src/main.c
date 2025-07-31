@@ -222,7 +222,7 @@ int main(int argc, char **argv) {
             if(steps > 1) printf(" (%d steps)", steps);
             printf("\n");
             break;
-        case KERNEL_BLUR: printf("Blur\n"); break;
+        case KERNEL_BLUR: printf("Blur\n"); 
             if(steps > 1) printf(" (%d steps)", steps);
             printf("\n");
             break;
@@ -301,30 +301,90 @@ int main(int argc, char **argv) {
                 if(steps > 1) printf(" (%d steps)", steps);
                 printf("...\n");
 
+                uint8_t **current_input = gray;
+                uint8_t **current_output = output;
+
                 for(uint8_t i = 0; i < steps; i++) {
-                    apply_convolution(gray, output, image->height, image->width, kernel);
+                    apply_convolution(current_input, current_output, image->height, image->width, kernel);
                     if(i < steps-1) {
-                        uint8_t **swap = gray;
-                        gray = output;
-                        output = (swap == gray && temp) ? temp : gray; // TODO: Re-learn this part
+                        uint8_t **swap = current_input;
+                        current_input = current_output;
+                        current_output = (swap == gray) ? temp : gray; // TODO: Re-learn this part
                     }
                 }
 
+                ihdr.color_type = 0;
                 save_png(output_file, output, ihdr, 1); // 1 - GRAY
-                free_pixel_matrix(gray, image->height);
+                // free gray
+                if(gray != image->pixels) {
+                    free_pixel_matrix(gray, image->height);
+                }
                 free_pixel_matrix(output, image->height);
-                free_pixel_matrix(temp, image->height);
-            }
-            else if(kernel != KERNEL_NONE) {
-                if(image->channels >= 3) { // RGB
-                    uint8_t **output = allocate_pixel_matrix(image->height, image->width * image->channels);
-
-                    printf("Applying filter..\n");
-                    if(steps > 1) printf(" (%d steps)", steps);
-                    printf("...\n");
+                if(temp) {
+                    free_pixel_matrix(temp, image->height);
                 }
             }
+            else if(kernel != KERNEL_NONE) {
+                uint8_t **output = allocate_pixel_matrix(image->height, image->width * image->channels);
+                uint8_t **temp = NULL;
+
+                printf("Applying filter..\n");
+                if(steps > 1) printf(" (%d steps)", steps);
+                printf("...\n");
+
+                if(steps > 1) {
+                    temp = allocate_pixel_matrix(image->height, image->width * image->channels);
+                }
+
+                uint8_t **current_input = image->pixels;
+                uint8_t **current_output = output;
+
+                if(steps == 0) steps = 1;
+                for(uint16_t i = 0; i < steps; i++) {
+
+                    uint8_t **temp_input = allocate_pixel_matrix(image->height, image->width);
+                    uint8_t **temp_output = allocate_pixel_matrix(image->height, image->width);
+
+                    for(uint32_t channel = 0; channel < image->channels; channel++) {
+                        for(uint32_t y = 0; y < image->height; y++) {
+                            for(uint32_t x = 0; x < image->width; x++) {
+                                temp_input[y][x] = current_input[y][x * image->channels + channel];
+                            }
+                        }
+                        apply_convolution(temp_input, temp_output, image->height, image->width, kernel);
+                        for(uint32_t y = 0; y < image->height; y++) {
+                            for(uint32_t x = 0; x < image->width; x++) {
+                                current_output[y][x * image->channels + channel] = temp_output[y][x];
+                            }
+                        }
+                    }
+
+                    free_pixel_matrix(temp_input, image->height);
+                    free_pixel_matrix(temp_output, image->width);
+
+                    if(i < steps - 1) {
+                        uint8_t **swap = current_input;
+                        current_input = current_output;
+                        current_output = (swap == image->pixels) ? temp : image->pixels;
+                    }
+                }
+
+                save_png(output_file, current_output, ihdr, image->channels);
+                free_pixel_matrix(output, image->height);
+                if(temp) {
+                    free_pixel_matrix(temp, image->height);
+                }
+            }
+            else {
+                save_png(output_file, image->pixels, ihdr, image->channels);
+            }
         }
+        free_pixel_matrix(image->pixels, image->height);
+        free(image);
+    }
+    else {
+        fprintf(stderr, "ERROR: No image data found\n");
+        exit(1);
     }
 
     return 0;

@@ -6,7 +6,7 @@
 #include <stdio.h>
 
 #define PNG_SIG_SIZE 8
-const uint8_t png_signature[PNG_SIG_SIZE] = {137, 80, 78, 71, 13, 10, 26, 10};
+extern const uint8_t png_signature[PNG_SIG_SIZE];
 
 void read_bytes(FILE *file, void *buffer, size_t buffer_size);
 void write_bytes(FILE *file, const void *buffer, size_t buffer_size);

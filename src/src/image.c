@@ -69,6 +69,10 @@ image_t *process_idat_chunks(ihdr_t *ihdr, uint8_t *idat_data, uint64_t idat_siz
 
         case 2: //RGB
             channels = 3;
+            bpp = 3;
+            break;
+        case 3:
+            channels = 3;
             fprintf(stderr, "ERROR: Palette images not supported\n");
             return NULL;
 
@@ -168,7 +172,7 @@ void apply_convolution(uint8_t **input, uint8_t **output, uint32_t height, uint3
         },
         {//gaussian
             {1/16.0, 2/16.0, 1/16.0},
-            {2/16.0, 4/16.0, 1/16.0},
+            {2/16.0, 4/16.0, 2/16.0},
             {1/16.0, 2/16.0, 1/16.0}
         },
         {//blur
@@ -214,7 +218,7 @@ void apply_convolution(uint8_t **input, uint8_t **output, uint32_t height, uint3
                 for(int32_t ky = -1; ky <= 1; ky++) {
                     for(int32_t kx = -1; kx <= 1; kx++) {
                         uint8_t pixel = input[y+ky][x+kx];
-                        sum += pixel * kernels[kernel_type][ky+1][ky+1];
+                        sum += pixel * kernels[kernel_type][ky+1][kx+1];
                     }
                 }
                 // valid range

@@ -7,6 +7,8 @@
 #include "../include/utils.h"
 #include "../include/png_io.h"
 
+const uint8_t png_signature[PNG_SIG_SIZE] = {137, 80, 78, 71, 13, 10, 26, 10};
+
 void read_bytes(FILE *file, void *buffer, size_t buffer_size) {
     size_t n = fread(buffer, buffer_size, 1, file);
     if(n != 1) {
@@ -163,7 +165,7 @@ void print_info(FILE *file) {
         uint8_t chunk_type[4];
         read_chunk_type(file, chunk_type);
 
-        printf("Chunk: %.4s (size: %u KB)\n", chunk_type, chunk_size/1024);
+        printf("Chunk: %.4s (size: %u B)\n", chunk_type, chunk_size);
 
         if(memcmp(chunk_type, "IHDR", 4) == 0) {
             ihdr_t ihdr;
