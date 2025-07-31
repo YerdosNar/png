@@ -1,8 +1,8 @@
 #ifndef UTILS_H
 #define UTILS_H
 
-#include "image.h"
-#include "include.h"
+#include <stdint.h>
+#include <stdio.h>
 
 uint64_t crc(uint8_t *buffer, int len);
 void reverse_bytes(void *buffer, size_t buffer_size);

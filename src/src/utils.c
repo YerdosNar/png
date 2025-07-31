@@ -1,4 +1,5 @@
 #include "../include/utils.h"
+#include <stdlib.h>
 
 static uint64_t crc_table[256];
 static int crc_table_computed = 0;
@@ -68,3 +69,5 @@ void free_pixel_matrix(uint8_t **matrix, uint32_t height) {
     }
     free(matrix);
 }
+
+

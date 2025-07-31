@@ -1,7 +1,7 @@
 #ifndef IMAGE_H
 #define IMAGE_H
 
-#include "include.h"
+#include <stdint.h>
 
 typedef struct {
     uint8_t r, b, g, a;

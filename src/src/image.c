@@ -1,3 +1,7 @@
+#include <stdlib.h>
+#include <string.h>
+#include <math.h>
+#include <zlib.h>
 #include "../include/image.h"
 #include "../include/utils.h"
 
