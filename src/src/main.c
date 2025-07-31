@@ -1,7 +1,9 @@
 #include <stdbool.h>
+#include <stdlib.h>
 #include <string.h>
 #include "../include/png_io.h"
 #include "../include/image.h"
+#include "../include/utils.h"
 
 void usage(char *exec_name) {
     printf("Usage: %s <input.png> -o <output.png> [options]\n", exec_name);
@@ -121,6 +123,9 @@ int main(int argc, char **argv) {
             if(!conflict_kernel) {
                 conflict_kernel = true;
                 kernel = KERNEL_GAUSSIAN;
+                if(i + 1 < argc && argv[i+1][0] >= '0' && argv[i+1][0] <= '9') {
+                    steps = (uint8_t)(strtol(argv[++i], NULL, 10));
+                }
             } else {
                 fprintf(stderr, "ERROR: Two or more kernel chosen\n");
                 return 1;
@@ -130,6 +135,9 @@ int main(int argc, char **argv) {
             if(!conflict_kernel) {
                 conflict_kernel = true;
                 kernel = KERNEL_BLUR;
+                if(i + 1 < argc && argv[i+1][0] >= '0' && argv[i+1][0] <= '9') {
+                    steps = (uint8_t)(strtol(argv[++i], NULL, 10));
+                }
             } else {
                 fprintf(stderr, "ERROR: Two or more kernel chosen\n");
                 return 1;
@@ -193,6 +201,7 @@ int main(int argc, char **argv) {
         return 1;
     }
 
+    // Check if it is png
     uint8_t signature[PNG_SIG_SIZE];
     read_bytes(input_f, signature, PNG_SIG_SIZE);
     if(memcmp(signature, png_signature, PNG_SIG_SIZE) != 0) {
@@ -201,6 +210,121 @@ int main(int argc, char **argv) {
         print_bytes(signature, PNG_SIG_SIZE);
         fclose(input_f);
         return 1;
+    }
+
+    printf("Processing: %s\n", input_file);
+    printf("Kernel: ");
+    switch(kernel) {
+        case KERNEL_SOBEL_X: printf("Sobel X\n"); break;
+        case KERNEL_SOBEL_Y: printf("Sobel Y\n"); break;
+        case KERNEL_SOBEL_COMBINED: printf("Sobel combined\n"); break;
+        case KERNEL_GAUSSIAN: printf("Gaussian");
+            if(steps > 1) printf(" (%d steps)", steps);
+            printf("\n");
+            break;
+        case KERNEL_BLUR: printf("Blur\n"); break;
+            if(steps > 1) printf(" (%d steps)", steps);
+            printf("\n");
+            break;
+        case KERNEL_LAPLACIAN: printf("Laplacian\n"); break;
+        case KERNEL_SHARPEN: printf("Sharpen\n"); break;
+        case KERNEL_NONE: printf("None\n"); break;
+    }
+    printf("Output format: %s\n\n", force_grayscale ? "Grayscale" : "RGB");
+
+    ihdr_t ihdr;
+    uint8_t *idat_data = NULL;
+    uint64_t idat_size = 0;
+    uint64_t idat_cap = 0;
+    bool quit = false;
+
+    while(!quit) {
+        uint32_t chunk_size = read_chunk_size(input_f);
+        uint8_t chunk_type[4];
+        read_chunk_type(input_f, chunk_type);
+
+        if(memcmp(chunk_type, "IHDR", sizeof(chunk_type)) == 0) {
+            read_bytes(input_f, &ihdr.width, 4);
+            read_bytes(input_f, &ihdr.height, 4);
+            read_bytes(input_f, &ihdr.bit_depth, 1);
+            read_bytes(input_f, &ihdr.color_type, 1);
+            read_bytes(input_f, &ihdr.compression, 1);
+            read_bytes(input_f, &ihdr.filter, 1);
+            read_bytes(input_f, &ihdr.interlace, 1);
+
+            reverse_bytes(&ihdr.width, sizeof(ihdr.width));
+            reverse_bytes(&ihdr.height, sizeof(ihdr.height));
+
+            printf("Image dimensions: %u x %u px\n", ihdr.width, ihdr.height);
+            printf("Bit depth: %u, Color type: %u\n", ihdr.bit_depth, ihdr.color_type);
+        }
+        // TODO: Re-learn this block of code
+        else if(memcmp(chunk_type, "IDAT", 4) == 0) {
+            if(idat_cap < idat_size + chunk_size) {
+                idat_cap = (idat_size + chunk_size) * 2;
+                idat_data = realloc(idat_data, idat_cap); // FREE <- FLAG
+                if(!idat_data) {
+                    fprintf(stderr, "ERROR: Could not reallocate memory for IDAT\n");
+                    exit(1);
+                }
+            }
+            read_bytes(input_f, idat_data + idat_size, chunk_size);
+            idat_size += chunk_size;
+        }
+        else if(memcmp(chunk_type, "IEND", 4) == 0) {
+            quit = true;
+        }
+        else {
+            fseek(input_f, chunk_size, SEEK_CUR);
+        }
+
+        read_chunk_crc(input_f);
+    }
+    fclose(input_f);
+
+    // create new PNG file
+    if(idat_data && idat_size > 0) {
+        printf("\nProcessing image data...\n");
+        image_t *image = process_idat_chunks(&ihdr, idat_data, idat_size);
+
+        if(image) {
+            if(force_grayscale) {
+                uint8_t **gray = rgb_to_grayscale(image);
+                uint8_t **output = allocate_pixel_matrix(image->height, image->width);
+                uint8_t **temp = NULL;
+
+                if(steps > 1) {
+                    temp = allocate_pixel_matrix(image->height, image->width);
+                }
+
+                printf("Applying filter...\n");
+                if(steps > 1) printf(" (%d steps)", steps);
+                printf("...\n");
+
+                for(uint8_t i = 0; i < steps; i++) {
+                    apply_convolution(gray, output, image->height, image->width, kernel);
+                    if(i < steps-1) {
+                        uint8_t **swap = gray;
+                        gray = output;
+                        output = (swap == gray && temp) ? temp : gray; // TODO: Re-learn this part
+                    }
+                }
+
+                save_png(output_file, output, ihdr, 1); // 1 - GRAY
+                free_pixel_matrix(gray, image->height);
+                free_pixel_matrix(output, image->height);
+                free_pixel_matrix(temp, image->height);
+            }
+            else if(kernel != KERNEL_NONE) {
+                if(image->channels >= 3) { // RGB
+                    uint8_t **output = allocate_pixel_matrix(image->height, image->width * image->channels);
+
+                    printf("Applying filter..\n");
+                    if(steps > 1) printf(" (%d steps)", steps);
+                    printf("...\n");
+                }
+            }
+        }
     }
 
     return 0;
