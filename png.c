@@ -14,20 +14,20 @@
 const uint8_t png_sig[PNG_SIG_SIZE] = {137, 80, 78, 71, 13, 10, 26, 10};
 
 typedef struct {
-    uint32_t width, 
-            height;
-    uint8_t bit_depth, 
-            color_type, 
-            compression,
-            filter,
-            interlace;
+    uint32_t width;
+    uint32_t height;
+    uint8_t bit_depth;
+    uint8_t color_type;
+    uint8_t compression;
+    uint8_t filter;
+    uint8_t interlace;
 } ihdr_t;
 
 typedef struct {
     uint8_t **pixels; // 2d matrix for output
-    uint32_t width,
-            height,
-            channels; //1 - grayscale, 3 - RGB, 4 - RGBA
+    uint32_t width;
+    uint32_t height;
+    uint32_t channels; //1 - grayscale, 3 - RGB, 4 - RGBA
 } image_t;
 
 typedef enum {
@@ -550,7 +550,7 @@ void print_info(FILE *file) {
         uint8_t chunk_type[4];
         read_chunk_type(file, chunk_type);
 
-        printf("Chunk: %.4s (size: %u KB)\n", chunk_type, chunk_size/1024);
+        printf("|Chunk: %.4s (size: %u KB)\n", chunk_type, chunk_size/1024);
 
         if(memcmp(chunk_type, "IHDR", 4) == 0) {
             ihdr_t ihdr;
@@ -565,9 +565,9 @@ void print_info(FILE *file) {
             ihdr.width = ntohl(ihdr.width);
             ihdr.height = ntohl(ihdr.height);
 
-            printf("  Dimensions:  %u x %u pixels\n", ihdr.width, ihdr.height);
-            printf("  Bit depth:   %u\n", ihdr.bit_depth);
-            printf("  Color type:  %u (", ihdr.color_type);
+            printf("|  Dimensions:  %u x %u pixels\n", ihdr.width, ihdr.height);
+            printf("|  Bit depth:   %u\n", ihdr.bit_depth);
+            printf("|  Color type:  %u (", ihdr.color_type);
             switch(ihdr.color_type) {
                 case 0: printf("Grayscale"); break;
                 case 2: printf("RGB"); break;
@@ -577,9 +577,9 @@ void print_info(FILE *file) {
                 default: printf("Unknown");
             }
             printf(")\n");
-            printf("  Compression: %u\n", ihdr.compression);
-            printf("  Filter:      %u\n", ihdr.filter);
-            printf("  Interlace:   %u\n", ihdr.interlace);
+            printf("|  Compression: %u\n", ihdr.compression);
+            printf("|  Filter:      %u\n", ihdr.filter);
+            printf("|  Interlace:   %u\n", ihdr.interlace);
         }
         else if(memcmp(chunk_type, "tEXt", 4) == 0) {
             uint8_t *text_data = malloc(chunk_size + 1);
@@ -588,7 +588,7 @@ void print_info(FILE *file) {
 
             char *keyword = (char*)text_data;
             char *text = keyword + strlen(keyword) + 1;
-            printf("  Text: %s = %s\n", keyword, text);
+            printf("|  Text: %s = %s\n", keyword, text);
             free(text_data);
         }
         else if(memcmp(chunk_type, "IEND", 4) == 0) {
@@ -600,6 +600,7 @@ void print_info(FILE *file) {
 
         read_chunk_crc(file);
     }
+    printf("======================\n");
 }
 
 int main(int argc, char **argv) {
