@@ -10,7 +10,6 @@ void print_bytes(uint8_t *buffer, size_t buffer_size) {
     printf("\n");
 }
 
-
 void read_bytes(FILE *file, void *buffer, size_t size) {
     size_t n = fread(buffer, size, 1, file);
     if(1 != n) {
@@ -34,19 +33,21 @@ void write_bytes(FILE *file, const void *buffer, size_t size) {
 
 uint32_t read_chunk_size(FILE *file) {
     uint32_t size;
-    read_bytes(file, &size, 4); // chunk size = 4
+    read_bytes(file, &size, 4);
     reverse(&size, sizeof(size));
     return size;
 }
+
 void write_chunk_size(FILE *file, uint32_t size) {
     write_bytes(file, &size, sizeof(size));
 }
 
 void read_chunk_type(FILE *file, uint8_t *type) {
-    read_bytes(file, type, 4); // chunk type = 4 letter(bytes)
+    read_bytes(file, type, 4);
 }
+
 void write_chunk_type(FILE *file, const char type[]) {
-    write_bytes(file, &type, 4);
+    write_bytes(file, type, 4);  // Fixed: removed & operator
 }
 
 uint32_t read_chunk_crc(FILE *file) {
@@ -55,89 +56,113 @@ uint32_t read_chunk_crc(FILE *file) {
     reverse(&crc, sizeof(crc));
     return crc;
 }
+
 void write_chunk_crc(FILE *file, uint32_t crc) {
     write_bytes(file, &crc, sizeof(crc));
 }
 
-
 void write_chunk(FILE *file, const char type[], uint8_t *data, uint32_t length_le) {
-    // before writing, convert to Big_ENDIAN
-    //reverse(&length_le, sizeof(length_le));
-    write_bytes(file, &length_le, sizeof(length_le));
+    // Convert length to big endian for writing
+    uint32_t length_be = length_le;
+    reverse(&length_be, sizeof(length_be));
+    write_bytes(file, &length_be, sizeof(length_be));
 
-    write_bytes(file, &type, 4);
+    // Write chunk type
+    write_bytes(file, type, 4);  // Fixed: removed & operator
 
-    // if Data exists
-    if(length_le > 0) {
+    // Write data if it exists
+    if(length_le > 0 && data != NULL) {
         write_bytes(file, data, length_le);
     }
 
-    // Calculate CRC
-    uint8_t *crc_buf = malloc(4+length_le); //type+data
-    memcpy(crc_buf, type, 4); // first comes type
-    if(length_le > 0) {
-        memcpy(crc_buf + 4, data, length_le); // skip 4 bytes after type, and write data
+    // Calculate and write CRC
+    uint8_t *crc_buf = malloc(4 + length_le);
+    if(!crc_buf) {
+        fprintf(stderr, "ERROR: Could not allocate memory for CRC calculation\n");
+        exit(1);
     }
-    uint32_t crc_val = crc(crc_buf, 4+length_le);
-    // convert CRC to BIG_ENDIAN 
+    
+    memcpy(crc_buf, type, 4);
+    if(length_le > 0 && data != NULL) {
+        memcpy(crc_buf + 4, data, length_le);
+    }
+    
+    uint32_t crc_val = crc(crc_buf, 4 + length_le);
     reverse(&crc_val, sizeof(crc_val));
+    write_bytes(file, &crc_val, sizeof(crc_val));
+    
     free(crc_buf);
 }
 
-//save img as PNG
 void save_png(const char *filename, uint8_t **pixels,
-                        uint32_t width, uint32_t height,
-                        uint8_t color_type, uint32_t channels) {
+              uint32_t width, uint32_t height,
+              uint8_t color_type, uint32_t channels) {
     FILE *file = fopen(filename, "wb");
     if(!file) {
         fprintf(stderr, "ERROR: Could not create output file %s\n", filename);
         exit(1);
     }
 
-    //write PNG signatur
+    // Write PNG signature
     write_bytes(file, png_sig, PNG_SIG_SIZE);
 
-    // IHDR
+    // Create IHDR chunk
     uint8_t ihdr_data[13];
-    reverse(&width, sizeof(width));
-    reverse(&height, sizeof(height));
-    memcpy(ihdr_data, &width, sizeof(width));
-    memcpy(ihdr_data+4, &height, sizeof(height));
-    ihdr_data[8] = 8; // bit depth
-    ihdr_data[9] = color_type; //colortype: 0-grayscale, 2-RGB
-    ihdr_data[10] = 0; //compression method
-    ihdr_data[11] = 0; //filter method
-    ihdr_data[12] = 0; //interlace method
+    uint32_t width_be = width;
+    uint32_t height_be = height;
+    reverse(&width_be, sizeof(width_be));
+    reverse(&height_be, sizeof(height_be));
+    
+    memcpy(ihdr_data, &width_be, sizeof(width_be));
+    memcpy(ihdr_data + 4, &height_be, sizeof(height_be));
+    ihdr_data[8] = 8;          // bit depth
+    ihdr_data[9] = color_type; // color type
+    ihdr_data[10] = 0;         // compression method
+    ihdr_data[11] = 0;         // filter method
+    ihdr_data[12] = 0;         // interlace method
     
     write_chunk(file, "IHDR", ihdr_data, sizeof(ihdr_data));
 
-    // img data with filter bytes
+    // Prepare image data with filter bytes
     uint32_t bytes_per_pixel = (color_type == 0) ? 1 : channels;
-    uint64_t raw_size = height * (1+width * bytes_per_pixel);
+    uint64_t raw_size = height * (1 + width * bytes_per_pixel);
     uint8_t *raw_data = malloc(raw_size);
-
-    for(uint32_t y = 0; y < height; y++) {
-        raw_data[y * (1+width * bytes_per_pixel)] = 0; // filter type: None
-        memcpy(raw_data + y * (1+width * bytes_per_pixel) + 1, pixels[y], width * bytes_per_pixel);
+    if(!raw_data) {
+        fprintf(stderr, "ERROR: Could not allocate memory for raw data\n");
+        fclose(file);
+        exit(1);
     }
 
-    // compress before writing
-    uint64_t compressed_size = compressBound(raw_size);
+    // Copy pixel data with filter bytes
+    for(uint32_t y = 0; y < height; y++) {
+        uint64_t row_offset = y * (1 + width * bytes_per_pixel);
+        raw_data[row_offset] = 0; // filter type: None
+        memcpy(raw_data + row_offset + 1, pixels[y], width * bytes_per_pixel);
+    }
+
+    // Compress data
+    uLongf compressed_size = compressBound(raw_size);
     uint8_t *compressed_data = malloc(compressed_size);
+    if(!compressed_data) {
+        fprintf(stderr, "ERROR: Could not allocate memory for compressed data\n");
+        free(raw_data);
+        fclose(file);
+        exit(1);
+    }
 
     int result = compress2(compressed_data, &compressed_size, raw_data, raw_size, Z_DEFAULT_COMPRESSION);
     if(result != Z_OK) {
-        fprintf(stderr, "ERROR: Failed to compress image data\n");
+        fprintf(stderr, "ERROR: Failed to compress image data (error: %d)\n", result);
         free(raw_data);
         free(compressed_data);
         fclose(file);
         exit(1);
     }
 
-    // write IDAT
-    write_chunk(file, "IDAT", compressed_data, compressed_size);
+    // Write IDAT chunk
+    write_chunk(file, "IDAT", compressed_data, (uint32_t)compressed_size);
 
-    // write IEND 
+    // Write IEND chunk
     write_chunk(file, "IEND", NULL, 0);
 
     free(raw_data);
@@ -198,13 +223,19 @@ void print_info(FILE *file) {
         }
         else if(memcmp(chunk_type, "tEXt", 4) == 0) {
             uint8_t *text_data = malloc(chunk_size + 1);
-            read_bytes(file, text_data, chunk_size);
-            text_data[chunk_size] = '\0';
+            if(text_data) {
+                read_bytes(file, text_data, chunk_size);
+                text_data[chunk_size] = '\0';
 
-            char *keyword = (char*)text_data;
-            char *text = keyword + strlen(keyword) + 1;
-            printf("|  Text: %s = %s\n", keyword, text);
-            free(text_data);
+                char *keyword = (char*)text_data;
+                char *text = keyword + strlen(keyword) + 1;
+                if(text < (char*)text_data + chunk_size) {
+                    printf("|  Text: %s = %s\n", keyword, text);
+                }
+                free(text_data);
+            } else {
+                fseek(file, chunk_size, SEEK_CUR);
+            }
         }
         else if(memcmp(chunk_type, "IEND", 4) == 0) {
             quit = true;

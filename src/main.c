@@ -60,6 +60,10 @@ int main(int argc, char **argv) {
             }
 
             FILE *file = fopen(input_file, "rb");
+            if(!file) {
+                fprintf(stderr, "ERROR: Could not open file %s\n", input_file);
+                return 1;
+            }
             print_info(file);
             fclose(file);
             return 0;
@@ -125,7 +129,6 @@ int main(int argc, char **argv) {
             if(!conflict_kernel) {
                 conflict_kernel = true;
                 kernel = KERNEL_BLUR;
-                // steps for blur
                 if(i + 1 < argc && argv[i+1][0] >= '0' && argv[i+1][0] <= '9') {
                     steps = (uint8_t)(strtol(argv[++i], NULL, 10));
                 }
@@ -162,7 +165,7 @@ int main(int argc, char **argv) {
         }
     }
 
-    // validate args 
+    // Validate args 
     if(!input_file) {
         fprintf(stderr, "ERROR: No input file specified\n");
         usage(argv[0]);
@@ -174,25 +177,25 @@ int main(int argc, char **argv) {
         output_file = "out.png";
     }
 
-    // step for blur default 1
+    // Default steps to 1 if kernel is specified but steps is 0
     if(steps == 0 && kernel != KERNEL_NONE) {
         steps = 1;
     }
 
-    // edge detection work better on gray
+    // Edge detection works better on grayscale
     if((kernel == KERNEL_SOBEL_X || kernel == KERNEL_SOBEL_Y || 
        kernel == KERNEL_SOBEL_COMBINED || kernel == KERNEL_LAPLACIAN) && !force_grayscale) {
         printf("Note: Edge detection typically works better on grayscale images.\n");
         printf("Consider adding --grayscale flag.\n\n");
     }
 
-    FILE*input_fp = fopen(input_file, "rb");
+    FILE *input_fp = fopen(input_file, "rb");
     if(!input_fp) {
         fprintf(stderr, "ERROR: Could not open input file %s\n", input_file);
         return 1;
     }
 
-    // Is it PNG
+    // Check PNG signature
     uint8_t signature[PNG_SIG_SIZE];
     read_bytes(input_fp, signature, PNG_SIG_SIZE);
     if(memcmp(signature, png_sig, PNG_SIG_SIZE) != 0) {
@@ -246,11 +249,14 @@ int main(int argc, char **argv) {
         } else if(memcmp(chunk_type, "IDAT", 4) == 0) {
             if(idat_capacity < idat_size + chunk_size) {
                 idat_capacity = (idat_size + chunk_size) * 2;
-                idat_data = realloc(idat_data, idat_capacity);
-                if (!idat_data) {
+                uint8_t *new_idat_data = realloc(idat_data, idat_capacity);
+                if (!new_idat_data) {
                     fprintf(stderr, "ERROR: Could not reallocate memory for IDAT\n");
-                    exit(1);
+                    free(idat_data);
+                    fclose(input_fp);
+                    return 1;
                 }
+                idat_data = new_idat_data;
             }
             read_bytes(input_fp, idat_data + idat_size, chunk_size);
             idat_size += chunk_size;
@@ -264,44 +270,57 @@ int main(int argc, char **argv) {
     }
     fclose(input_fp);
 
-    //now we need to create a new image
+    // Process the image
     if(idat_data && idat_size > 0) {
         printf("\nProcessing image data...\n");
         image_t *image = process_idat_chunks(&ihdr, idat_data, idat_size);
 
         if(image) {
-            if(force_grayscale) {
-                // grayscale
+            if(force_grayscale || image->channels == 1) {
+                // Convert to grayscale if needed
                 uint8_t **grayscale = rgb_to_grayscale(image);
                 uint8_t **processed = allocate_pixel_matrix(image->height, image->width);
                 uint8_t **temp = NULL;
+
+                // Initialize processed matrix
+                for(uint32_t y = 0; y < image->height; y++) {
+                    memcpy(processed[y], grayscale[y], image->width);
+                }
 
                 if(steps > 1) {
                     temp = allocate_pixel_matrix(image->height, image->width);
                 }
 
+                // Apply convolution
+                if(kernel != KERNEL_NONE) {
+                    printf("Applying filter");
+                    if(steps > 1) printf(" (%d steps)", steps);
+                    printf("...\n");
 
-                // convolution apply
-                printf("Applying filter...\n");
-                if(steps > 1) printf(" (%d steps)", steps);
-                printf("...\n");
+                    uint8_t **input = processed;
+                    uint8_t **output = processed;
 
-                uint8_t **input = grayscale;
-                uint8_t **output = processed;
-
-                for(uint8_t i = 0; i < steps; i++) {
-                    apply_convolution(input, output, image->height, image->width, kernel);
-                    if(i < steps - 1) {
-                        uint8_t **swap = input;
+                    for(uint8_t i = 0; i < steps; i++) {
+                        if(i > 0) {
+                            // Swap buffers for multiple steps
+                            output = (input == processed) ? temp : processed;
+                        }
+                        apply_convolution(input, output, image->height, image->width, kernel);
                         input = output;
-                        output = (swap == grayscale && temp) ? temp : grayscale;
+                    }
+
+                    // Ensure final result is in processed
+                    if(output != processed && temp) {
+                        for(uint32_t y = 0; y < image->height; y++) {
+                            memcpy(processed[y], output[y], image->width);
+                        }
                     }
                 }
 
-                // save img
-                save_png(output_file, output, image->width, image->height, 0, 1);
+                // Save grayscale image
+                save_png(output_file, processed, image->width, image->height, 0, 1);
 
-                //cleaning
+                // Cleanup
                 if(grayscale != image->pixels) {
                     free_pixel_matrix(grayscale, image->height);
                 }
@@ -310,16 +329,21 @@ int main(int argc, char **argv) {
                     free_pixel_matrix(temp, image->height);
                 }
             }
-            else if(kernel != KERNEL_NONE){
-                // for RGB
+            else if(kernel != KERNEL_NONE) {
+                // Process RGB/RGBA image
                 if(image->channels >= 3) {
                     uint8_t **processed = allocate_pixel_matrix(image->height, image->width * image->channels);
+
+                    // Initialize with original data
+                    for(uint32_t y = 0; y < image->height; y++) {
+                        memcpy(processed[y], image->pixels[y], image->width * image->channels);
+                    }
 
                     printf("Applying filter");
                     if(steps > 1) printf(" (%d steps)", steps);
                     printf("...\n");
 
-                    //kernel to each channel
+                    // Apply kernel to each channel
                     for(uint32_t ch = 0; ch < 3; ch++) {
                         uint8_t **channel = allocate_pixel_matrix(image->height, image->width);
                         uint8_t **proc_channel = allocate_pixel_matrix(image->height, image->width);
@@ -329,21 +353,20 @@ int main(int argc, char **argv) {
                             temp_channel = allocate_pixel_matrix(image->height, image->width);
                         }
 
-                        // extract channel
+                        // Extract channel
                         for(uint32_t y = 0; y < image->height; y++) {
                             for(uint32_t x = 0; x < image->width; x++) {
                                 channel[y][x] = image->pixels[y][x * image->channels + ch];
                             }
                         }
 
-                        //apply kernel
+                        // Apply kernel
                         uint8_t **input = channel;
                         uint8_t **output = proc_channel;
 
                         for(uint8_t i = 0; i < steps; i++) {
                             apply_convolution(input, output, image->height, image->width, kernel);
 
-                            //swap
                             if(i < steps - 1) {
                                 uint8_t **swap = input;
                                 input = output;
@@ -351,16 +374,13 @@ int main(int argc, char **argv) {
                             }
                         }
 
-                        //copy 
+                        // Copy processed channel back
                         for(uint32_t y = 0; y < image->height; y++) {
                             for(uint32_t x = 0; x < image->width; x++) {
                                 processed[y][x * image->channels + ch] = output[y][x];
-                                // copy alpha
-                                if(image->channels == 4 && ch == 0) {
-                                    processed[y][x * image->channels + 3] = image->pixels[y][x * image->channels + 3];
-                                }
                             }
                         }
+
                         free_pixel_matrix(channel, image->height);
                         free_pixel_matrix(proc_channel, image->height);
                         if(temp_channel) {
@@ -368,30 +388,49 @@ int main(int argc, char **argv) {
                         }
                     }
 
-                    //save rgb
+                    // Copy alpha channel if present
+                    if(image->channels == 4) {
+                        for(uint32_t y = 0; y < image->height; y++) {
+                            for(uint32_t x = 0; x < image->width; x++) {
+                                processed[y][x * image->channels + 3] = image->pixels[y][x * image->channels + 3];
+                            }
+                        }
+                    }
+
+                    // Save RGB/RGBA image
                     uint8_t color_type = (image->channels == 4) ? 6 : 2;
                     save_png(output_file, processed, image->width, image->height, color_type, image->channels);
                     free_pixel_matrix(processed, image->height);
                 }
                 else {
-                    //if it is gray
+                    // Grayscale with kernel
                     uint8_t **processed = allocate_pixel_matrix(image->height, image->width);
                     uint8_t **temp = NULL;
+
+                    // Initialize with original data
+                    for(uint32_t y = 0; y < image->height; y++) {
+                        memcpy(processed[y], image->pixels[y], image->width);
+                    }
 
                     if(steps > 1) {
                         temp = allocate_pixel_matrix(image->height, image->width);
                     }
 
-                    uint8_t **input = image->pixels;
+                    uint8_t **input = processed;
                     uint8_t **output = processed;
 
                     for(uint8_t i = 0; i < steps; i++) {
+                        if(i > 0) {
+                            output = (input == processed) ? temp : processed;
+                        }
                         apply_convolution(input, output, image->height, image->width, kernel);
+                        input = output;
+                    }
 
-                        if(i < steps - 1) {
-                            uint8_t **swap = input;
-                            input = output;
-                            output = (swap == image->pixels && temp) ? temp : image->pixels;
+                    // Ensure final result is in processed
+                    if(output != processed && temp) {
+                        for(uint32_t y = 0; y < image->height; y++) {
+                            memcpy(processed[y], output[y], image->width);
                         }
                     }
 
@@ -403,24 +442,32 @@ int main(int argc, char **argv) {
                 }
             }
             else {
+                // No kernel applied - just save original or convert format
                 if(image->channels >= 3) {
-                    //save rgb/rgba img
+                    // Save RGB/RGBA image
                     uint8_t color_type = (image->channels == 4) ? 6 : 2;
                     save_png(output_file, image->pixels, image->width, image->height, color_type, image->channels);
                 }
                 else {
-                    //save grayscale img
+                    // Save grayscale image
                     save_png(output_file, image->pixels, image->width, image->height, 0, 1);
                 }
             }
 
             free_pixel_matrix(image->pixels, image->height);
             free(image);
+        } else {
+            fprintf(stderr, "ERROR: Failed to process image data\n");
+            free(idat_data);
+            return 1;
         }
 
         free(idat_data);
+    } else {
+        fprintf(stderr, "ERROR: No IDAT chunks found or empty image data\n");
+        return 1;
     }
+
     printf("\nDone!\n");
     return 0;
 }
-
