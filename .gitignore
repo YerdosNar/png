@@ -2,3 +2,6 @@ png
 output_file.png
 png_test.png
 out.png
+test.png
+obj/
+no_need/
