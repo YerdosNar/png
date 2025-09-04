@@ -14,8 +14,8 @@ A lightweight C program for reading, processing, and filtering PNG images with s
 - **Color Space Conversion**: Convert between RGB and grayscale
 - **Preserves Alpha Channel**: Maintains transparency information when processing RGBA images
 
-- **Find hidden chunks**: Finds not supported chunks other than IHDR, IDAT, IEND (Not supported currenly)
-- **Write custom chunks**: Write your own custom hidden chunks (Not supported currently)
+- **Find hidden chunks**: Finds not supported chunks other than IHDR, IDAT, IEND
+- **Write custom chunks**: Write your own custom hidden chunks
 
 ## Requirements
 
@@ -26,12 +26,9 @@ A lightweight C program for reading, processing, and filtering PNG images with s
 ## Building
 
 ```bash
-gcc -o png png.c -lz -lm
-```
-
-Or with optimization:
-```bash
-gcc -O2 -o png png.c -lz -lm
+git clone https://github.com/YerdosNar/PNG.git
+cd PNG
+make
 ```
 
 ## Usage
