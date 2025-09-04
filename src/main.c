@@ -2,6 +2,7 @@
 #include "../include/utils.h"
 #include "../include/png_io.h"
 #include "../include/processor.h"
+#include "../include/steganography.h"
 
 void usage(char *exec_name) {
     printf("Usage: %s <input.png> -o <output.png> [options]\n", exec_name);
@@ -24,7 +25,7 @@ void usage(char *exec_name) {
     printf("  %s photo.png -o blurred.png --gaussian\n", exec_name);
 
     printf("\n\n");
-    printf("Author: YerdosNar github.com/YerdosNar/png.git\n");
+    printf("Author: YerdosNar github.com/YerdosNar/PNG.git\n");
 }
 
 int main(int argc, char **argv) {
@@ -36,136 +37,192 @@ int main(int argc, char **argv) {
     char *input_file = NULL;
     char *output_file = NULL;
     bool force_grayscale = false;
-    bool conflict = false; 
+    bool conflict = false;
     bool conflict_kernel = false;
     kernel_type kernel = KERNEL_NONE;
     uint8_t steps = 0;
-    
-    for(int i = 1; i < argc; i++) {
-        if((strcmp(argv[i], "-h") == 0 || strcmp(argv[i], "--help") == 0) && i == 1) {
-            usage(argv[0]);
-            return 0;
-        } else if(!strcmp(argv[i], "-i") || !strcmp(argv[i], "--info")) {
-            if(argc < 3) {
-                fprintf(stderr, "ERROR: Invalid number of arguments for --info flag\n");
-                return 1;
-            }
 
-            if(!input_file) {
-                input_file = argv[2];
-                if(strstr(input_file, ".png") == NULL) {
-                    fprintf(stderr, "ERROR: Input file not provided for --info\n");
-                    return 1;
-                }
-            }
-
-            FILE *file = fopen(input_file, "rb");
+    // Hidde option, not listed in the usage info
+    if(!strcmp(argv[1], "--steg")) {
+        // "-f" finding hidden steganography
+        if(!strcmp(argv[2], "-f") && argc == 4) {
+            FILE *file = fopen(argv[3], "rb");
             if(!file) {
-                fprintf(stderr, "ERROR: Could not open file %s\n", input_file);
+                fprintf(stderr, "ERROR: Could not open file %s\n", argv[3]);
                 return 1;
             }
-            print_info(file);
+            detect(file);
+
             fclose(file);
             return 0;
-        } else if(!strcmp(argv[i], "-o") || !strcmp(argv[i], "--output")) {
-            if(i + 1 < argc) {
-                output_file = argv[++i];
-            } else {
-                fprintf(stderr, "ERROR: -o requires an argument\n");
-                return 1;
-            }
-        } else if((!strcmp(argv[i], "-g") || !strcmp(argv[i], "--grayscale")) && !conflict) {
-            if(!conflict) {
-                force_grayscale = true;
-                conflict = true;
-            } else {
-                fprintf(stderr, "ERROR: RGB and Grayscale both cannot be set\n");
-                return 1;
-            }
-        } else if(!strcmp(argv[i], "--rgb")) {
-            if(!conflict) {
-                force_grayscale = false;
-                conflict = true;
-            } else {
-                fprintf(stderr, "ERROR: RGB and Grayscale both cannot be set\n");
-                return 1;
-            }
-        } else if(!strcmp(argv[i], "--sobel-x")) {
-            if(!conflict_kernel) {
-                conflict_kernel = true;
-                kernel = KERNEL_SOBEL_X;
-            } else {
-                fprintf(stderr, "ERROR: Two or more kernels chosen\n");
-                return 1;
-            }
-        } else if(!strcmp(argv[i], "--sobel-y")) {
-            if(!conflict_kernel) {
-                conflict_kernel = true;
-                kernel = KERNEL_SOBEL_Y;
-            } else {
-                fprintf(stderr, "ERROR: Two or more kernels chosen\n");
-                return 1;
-            }
-        } else if(!strcmp(argv[i], "--sobel")) {
-            if(!conflict_kernel) {
-                conflict_kernel = true;
-                kernel = KERNEL_SOBEL_COMBINED;
-            } else {
-                fprintf(stderr, "ERROR: Two or more kernels chosen\n");
-                return 1;
-            }
-        } else if(!strcmp(argv[i], "--gaussian")) {
-            if(!conflict_kernel) {
-                conflict_kernel = true;
-                kernel = KERNEL_GAUSSIAN;
-                if(i + 1 < argc && argv[i+1][0] >= '0' && argv[i+1][0] <= '9') {
-                    steps = (uint8_t)(strtol(argv[++i], NULL, 10));
+        }
+        // "-i" injecting a custom chunk
+        else if (!strcmp(argv[2], "-i") && argc == 4) {
+            FILE *file = fopen(argv[3], "rb+");
+            printf("You chose to hide information...\n");
+            printf("Name the chunk(start with lowercase): ");
+            char type[6];
+            fgets(type, sizeof(type), stdin);
+            printf("You can hide up to 1KB(1023characters) message: ");
+            char message[1024];
+            fgets(message, sizeof(message), stdin);
+            inject_chunk(file, type, message);
+
+            fclose(file);
+            return 0;
+        }
+        // -d
+        else if(!strcmp(argv[2], "-d") && argc == 4) {
+            FILE *file = fopen(argv[3], "rb+");
+            printf("You chose to delete a chunk...\n");
+            printf("Enter the chunk's name: ");
+            char type[6];
+            fgets(type, sizeof(type), stdin);
+            delete_chunk(file, type);
+
+            fclose(file);
+            return 0;
+        }
+        // "--help" help for steg
+        else if(!strcmp(argv[2], "--help") || !strcmp(argv[2], "-h")) {
+            printf("Usage: %s --steg [options] <filename.png>\n", argv[0]);
+            printf("Options:\n");
+            printf("  -f                Finds a hidden injected chunks with its content\n");
+            printf("  -i                Injects a hidden chunk into the file\n");
+            printf("  -d                Delete a chunk by chunk name\n");
+            printf("  -h/--help         See this message\n");
+            printf("Example: %s --steg -f injected.png\n", argv[0]);
+
+            return 0;
+        }
+    }
+    else {
+        for(int i = 1; i < argc; i++) {
+            if((strcmp(argv[i], "-h") == 0 || strcmp(argv[i], "--help") == 0) && i == 1) {
+                usage(argv[0]);
+                return 0;
+            } else if(!strcmp(argv[i], "-i") || !strcmp(argv[i], "--info")) {
+                if(argc < 3) {
+                    fprintf(stderr, "ERROR: Invalid number of arguments for --info flag\n");
+                    return 1;
                 }
-            } else {
-                fprintf(stderr, "ERROR: Two or more kernels chosen\n");
-                return 1;
-            }
-        } else if(!strcmp(argv[i], "--blur")) {
-            if(!conflict_kernel) {
-                conflict_kernel = true;
-                kernel = KERNEL_BLUR;
-                if(i + 1 < argc && argv[i+1][0] >= '0' && argv[i+1][0] <= '9') {
-                    steps = (uint8_t)(strtol(argv[++i], NULL, 10));
+
+                if(!input_file) {
+                    input_file = argv[2];
+                    if(strstr(input_file, ".png") == NULL) {
+                        fprintf(stderr, "ERROR: Input file not provided for --info\n");
+                        return 1;
+                    }
                 }
-            } else {
-                fprintf(stderr, "ERROR: Two or more kernels chosen\n");
-                return 1;
+
+                FILE *file = fopen(input_file, "rb");
+                if(!file) {
+                    fprintf(stderr, "ERROR: Could not open file %s\n", input_file);
+                    return 1;
+                }
+                print_info(file);
+                fclose(file);
+                return 0;
+            } else if(!strcmp(argv[i], "-o") || !strcmp(argv[i], "--output")) {
+                if(i + 1 < argc) {
+                    output_file = argv[++i];
+                } else {
+                    fprintf(stderr, "ERROR: -o requires an argument\n");
+                    return 1;
+                }
+            } else if((!strcmp(argv[i], "-g") || !strcmp(argv[i], "--grayscale")) && !conflict) {
+                if(!conflict) {
+                    force_grayscale = true;
+                    conflict = true;
+                } else {
+                    fprintf(stderr, "ERROR: RGB and Grayscale both cannot be set\n");
+                    return 1;
+                }
+            } else if(!strcmp(argv[i], "--rgb")) {
+                if(!conflict) {
+                    force_grayscale = false;
+                    conflict = true;
+                } else {
+                    fprintf(stderr, "ERROR: RGB and Grayscale both cannot be set\n");
+                    return 1;
+                }
+            } else if(!strcmp(argv[i], "--sobel-x")) {
+                if(!conflict_kernel) {
+                    conflict_kernel = true;
+                    kernel = KERNEL_SOBEL_X;
+                } else {
+                    fprintf(stderr, "ERROR: Two or more kernels chosen\n");
+                    return 1;
+                }
+            } else if(!strcmp(argv[i], "--sobel-y")) {
+                if(!conflict_kernel) {
+                    conflict_kernel = true;
+                    kernel = KERNEL_SOBEL_Y;
+                } else {
+                    fprintf(stderr, "ERROR: Two or more kernels chosen\n");
+                    return 1;
+                }
+            } else if(!strcmp(argv[i], "--sobel")) {
+                if(!conflict_kernel) {
+                    conflict_kernel = true;
+                    kernel = KERNEL_SOBEL_COMBINED;
+                } else {
+                    fprintf(stderr, "ERROR: Two or more kernels chosen\n");
+                    return 1;
+                }
+            } else if(!strcmp(argv[i], "--gaussian")) {
+                if(!conflict_kernel) {
+                    conflict_kernel = true;
+                    kernel = KERNEL_GAUSSIAN;
+                    if(i + 1 < argc && argv[i+1][0] >= '0' && argv[i+1][0] <= '9') {
+                        steps = (uint8_t)(strtol(argv[++i], NULL, 10));
+                    }
+                } else {
+                    fprintf(stderr, "ERROR: Two or more kernels chosen\n");
+                    return 1;
+                }
+            } else if(!strcmp(argv[i], "--blur")) {
+                if(!conflict_kernel) {
+                    conflict_kernel = true;
+                    kernel = KERNEL_BLUR;
+                    if(i + 1 < argc && argv[i+1][0] >= '0' && argv[i+1][0] <= '9') {
+                        steps = (uint8_t)(strtol(argv[++i], NULL, 10));
+                    }
+                } else {
+                    fprintf(stderr, "ERROR: Two or more kernels chosen\n");
+                    return 1;
+                }
+            } else if(!strcmp(argv[i], "--laplacian")) {
+                if(!conflict_kernel) {
+                    conflict_kernel = true;
+                    kernel = KERNEL_LAPLACIAN;
+                } else {
+                    fprintf(stderr, "ERROR: Two or more kernels chosen\n");
+                    return 1;
+                }
+            } else if(!strcmp(argv[i], "--sharpen")) {
+                if(!conflict_kernel) {
+                    conflict_kernel = true;
+                    kernel = KERNEL_SHARPEN;
+                } else {
+                    fprintf(stderr, "ERROR: Two or more kernels chosen\n");
+                    return 1;
+                }
+            } else if(!strcmp(argv[i], "--none")) {
+                if(!conflict_kernel) {
+                    conflict_kernel = true;
+                    kernel = KERNEL_NONE;
+                } else {
+                    fprintf(stderr, "ERROR: Two or more kernels chosen\n");
+                    return 1;
+                }
+            } else if(strstr(argv[i], ".png") != NULL && input_file == NULL) {
+                input_file = argv[i];
             }
-        } else if(!strcmp(argv[i], "--laplacian")) {
-            if(!conflict_kernel) {
-                conflict_kernel = true;
-                kernel = KERNEL_LAPLACIAN;
-            } else {
-                fprintf(stderr, "ERROR: Two or more kernels chosen\n");
-                return 1;
-            }
-        } else if(!strcmp(argv[i], "--sharpen")) {
-            if(!conflict_kernel) {
-                conflict_kernel = true;
-                kernel = KERNEL_SHARPEN;
-            } else {
-                fprintf(stderr, "ERROR: Two or more kernels chosen\n");
-                return 1;
-            }
-        } else if(!strcmp(argv[i], "--none")) {
-            if(!conflict_kernel) {
-                conflict_kernel = true;
-                kernel = KERNEL_NONE;
-            } else {
-                fprintf(stderr, "ERROR: Two or more kernels chosen\n");
-                return 1;
-            }
-        } else if(strstr(argv[i], ".png") != NULL && input_file == NULL) {
-            input_file = argv[i];
         }
     }
 
-    // Validate args 
+    // Validate args
     if(!input_file) {
         fprintf(stderr, "ERROR: No input file specified\n");
         usage(argv[0]);
@@ -183,7 +240,7 @@ int main(int argc, char **argv) {
     }
 
     // Edge detection works better on grayscale
-    if((kernel == KERNEL_SOBEL_X || kernel == KERNEL_SOBEL_Y || 
+    if((kernel == KERNEL_SOBEL_X || kernel == KERNEL_SOBEL_Y ||
        kernel == KERNEL_SOBEL_COMBINED || kernel == KERNEL_LAPLACIAN) && !force_grayscale) {
         printf("Note: Edge detection typically works better on grayscale images.\n");
         printf("Consider adding --grayscale flag.\n\n");
@@ -211,7 +268,7 @@ int main(int argc, char **argv) {
         case KERNEL_SOBEL_Y: printf("Sobel Y\n"); break;
         case KERNEL_SOBEL_COMBINED: printf("Sobel Combined\n"); break;
         case KERNEL_GAUSSIAN: printf("Gaussian\n"); break;
-        case KERNEL_BLUR: printf("Blur"); 
+        case KERNEL_BLUR: printf("Blur");
             if(steps > 1) printf(" (%d steps)", steps);
             printf("\n");
             break;
