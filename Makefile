@@ -1,30 +1,41 @@
-CC=gcc
-CFLAGS= -Wall -Wextra -g -Iinclude
-LDFLAGS= -lz -lm # lz -> for zlib, lm -> for math
+# colors
+RESET	:= \033[0m
+RED		:= \033[31m
+GREEN	:= \033[32m
+BLUE	:= \033[34m
 
-TARGET=png
+# body
+CC		= gcc
+CFLAGS	= -Wall -Wextra -g -Iinclude
+LDFLAGS	= -lz -lm # lz -> for zlib, lm -> for math
 
-SRCDIR=src
-OBJDIR=obj
+TARGET	= png
 
-SOURCES=$(wildcard $(SRCDIR)/*.c)
-OBJECTS=$(patsubst $(SRCDIR)/%.c, $(OBJDIR)/%.o, $(SOURCES))
+SRCDIR  = src
+OBJDIR  = obj
+
+SOURCES = $(wildcard $(SRCDIR)/*.c)
+OBJECTS = $(patsubst $(SRCDIR)/%.c, $(OBJDIR)/%.o, $(SOURCES))
 
 .PHONY: all
 all: $(TARGET)
 
 $(TARGET): $(OBJECTS)
-	@echo "==> Linking..."
+	@printf "%b\n" "$(GREEN)===> Linking...$(RESET)"
 	$(CC) $^ -o $@ $(LDFLAGS)
-	@echo "==> Build finished successfully: $(TARGET)"
+	@printf "%b\n" "$(GREEN)===> Build finished successfully: $(RESET)✅"
+	@printf "%b\n" "$(RED)            vvvvvvvvv$(RESET)"
+	@printf "%b\n" "$(RED)            ==>$(TARGET)<==$(RESET)"
+	@printf "%b\n" "$(RED)            ^^^^^^^^^$(RESET)"
 
 $(OBJDIR)/%.o: $(SRCDIR)/%.c
 	@mkdir -p $(OBJDIR)
-	@echo "===> Compiling $<..."
+	@printf "%b\n" "$(BLUE)==> Compiling 🚀 $<...$(RESET)"
 	$(CC) $(CFLAGS) -c $< -o $@
+	@printf "%b\n" "$(GREEN)Done!$(RESET) ✅"
 
 .PHONY: clean
 clean:
-	@echo "=> Cleaning up build files..."
+	@printf "%b\n" "$(RED)==> Cleaning up build files...$(RESET)"
 	rm -rf $(OBJDIR) $(TARGET)
-	@echo "=> Clean complete!"
+	@printf "%b\n" "$(GREEN)==> Clean complete!$(RESET)✅"

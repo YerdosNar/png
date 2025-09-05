@@ -52,7 +52,7 @@ bool detect(FILE *file) {
         // Check for private, ancillary chunk (first letter is lowercase)
         if(chunk_type[0] >= 'a' && chunk_type[0] <= 'z') {
             found_hidden_chunk = true;
-            printf("\n✅ Found hidden chunk: %s\n", chunk_type);
+            printf("\n✅ Found hidden chunk: \033[31m%s\033[0m\n", chunk_type);
             printf("   Length: %u bytes\n", chunk_size);
 
             if(chunk_size > 0) {
@@ -81,7 +81,7 @@ bool detect(FILE *file) {
 
     if(!found_hidden_chunk) {
         printf("No hidden chunks found!\n");
-        printf("File is clean.\n");
+        printf("\033[32mFile is clean.\033[0m\n");
     }
     rewind(file);
     return found_hidden_chunk;
@@ -158,6 +158,16 @@ void inject_chunk(FILE *file, char type[], char message[]) {
     printf("\n🚀 Successfully injected chunk '%s' with a %u-byte message.\n", type, msg_len);
 }
 
+/**
+* @brief Deletes a specific ancillary chunk from a PNG file.
+*
+* This function work by finding the target chunk, reading all subsequent file
+* dta into a buffer, writing that buffer back over the target chunk's location,
+* and finally truncating the file to its new, shorter size.
+*
+* @param file A pointer in "r+b" mode
+* @param type the 4-character type for chunk_type
+*/
 void delete_chunk(FILE *file, char type[]) {
     if(!file) {
         fprintf(stderr, "ERROR: Invalid file pointer passed to delete_chunk()\n");

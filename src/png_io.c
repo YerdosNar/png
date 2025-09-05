@@ -81,16 +81,16 @@ void write_chunk(FILE *file, const char type[], uint8_t *data, uint32_t length_l
         fprintf(stderr, "ERROR: Could not allocate memory for CRC calculation\n");
         exit(1);
     }
-    
+
     memcpy(crc_buf, type, 4);
     if(length_le > 0 && data != NULL) {
         memcpy(crc_buf + 4, data, length_le);
     }
-    
+
     uint32_t crc_val = crc(crc_buf, 4 + length_le);
     reverse(&crc_val, sizeof(crc_val));
     write_bytes(file, &crc_val, sizeof(crc_val));
-    
+
     free(crc_buf);
 }
 
@@ -112,7 +112,7 @@ void save_png(const char *filename, uint8_t **pixels,
     uint32_t height_be = height;
     reverse(&width_be, sizeof(width_be));
     reverse(&height_be, sizeof(height_be));
-    
+
     memcpy(ihdr_data, &width_be, sizeof(width_be));
     memcpy(ihdr_data + 4, &height_be, sizeof(height_be));
     ihdr_data[8] = 8;          // bit depth
@@ -120,7 +120,7 @@ void save_png(const char *filename, uint8_t **pixels,
     ihdr_data[10] = 0;         // compression method
     ihdr_data[11] = 0;         // filter method
     ihdr_data[12] = 0;         // interlace method
-    
+
     write_chunk(file, "IHDR", ihdr_data, sizeof(ihdr_data));
 
     // Prepare image data with filter bytes
@@ -183,14 +183,19 @@ void print_info(FILE *file) {
     printf("PNG File Information:\n");
     print_bytes(signature, PNG_SIG_SIZE);
     printf("============ INFO ============\n");
-    
+
     bool quit = false;
     while(!quit) {
         uint32_t chunk_size = read_chunk_size(file);
         uint8_t chunk_type[4];
         read_chunk_type(file, chunk_type);
 
-        printf("|Chunk: %.4s (size: %.u KB)\n", chunk_type, chunk_size/1024);
+        if(chunk_size > 100*1024) {
+            uint32_t chunk_size_KB = chunk_size / 1024;
+            printf("|Chunk: %.4s (size: %.u KB)\n", chunk_type, chunk_size_KB);
+        } else {
+            printf("|Chunk: %.4s (size: %.u B)\n", chunk_type, chunk_size);
+        }
 
         if(memcmp(chunk_type, "IHDR", 4) == 0) {
             ihdr_t ihdr;
@@ -221,27 +226,33 @@ void print_info(FILE *file) {
             printf("|  Filter:      %u\n", ihdr.filter);
             printf("|  Interlace:   %u\n", ihdr.interlace);
         }
-        else if(memcmp(chunk_type, "tEXt", 4) == 0) {
-            uint8_t *text_data = malloc(chunk_size + 1);
-            if(text_data) {
-                read_bytes(file, text_data, chunk_size);
-                text_data[chunk_size] = '\0';
-
-                char *keyword = (char*)text_data;
-                char *text = keyword + strlen(keyword) + 1;
-                if(text < (char*)text_data + chunk_size) {
-                    printf("|  Text: %s = %s\n", keyword, text);
-                }
-                free(text_data);
-            } else {
-                fseek(file, chunk_size, SEEK_CUR);
-            }
+        // else if(memcmp(chunk_type, "tEXt", 4) == 0) {
+        //     uint8_t *text_data = malloc(chunk_size + 1);
+        //     if(text_data) {
+        //         read_bytes(file, text_data, chunk_size);
+        //         text_data[chunk_size] = '\0';
+        //
+        //         char *keyword = (char*)text_data;
+        //         char *text = keyword + strlen(keyword) + 1;
+        //         if(text < (char*)text_data + chunk_size) {
+        //             printf("|  Text: %s = %s\n", keyword, text);
+        //         }
+        //         free(text_data);
+        //     } else {
+        //         fseek(file, chunk_size, SEEK_CUR);
+        //     }
+        // }
+        else if(memcmp(chunk_type, "IDAT", 4) == 0) {
+            fseek(file, chunk_size, SEEK_CUR);
         }
         else if(memcmp(chunk_type, "IEND", 4) == 0) {
             quit = true;
         }
         else {
-            fseek(file, chunk_size, SEEK_CUR);
+            char buffer[chunk_size];
+            read_bytes(file, &buffer, sizeof(buffer));
+            buffer[chunk_size] = '\0';
+            printf("|  Text: %s\n", buffer);
         }
         printf("==============================\n");
 

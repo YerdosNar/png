@@ -44,8 +44,24 @@ int main(int argc, char **argv) {
 
     // Hidde option, not listed in the usage info
     if(!strcmp(argv[1], "--steg")) {
+        // "--help" help for steg
+        if(argc < 3 || (!strcmp(argv[2], "--help") || !strcmp(argv[2], "-h"))) {
+            printf("Usage: %s --steg [options] <filename.png>\n", argv[0]);
+            printf("\nOptions:\n");
+            printf("  -f                        Finds a hidden injected chunks with its content\n");
+            printf("  -i                        Injects a hidden chunk into the file\n");
+            printf("  -d                        Delete a chunk by chunk name\n");
+            printf("  -h/--help                 See this message\n");
+            printf("Example: %s --steg -f injected.png\n", argv[0]);
+
+            return 0;
+        }
         // "-f" finding hidden steganography
-        if(!strcmp(argv[2], "-f") && argc == 4) {
+        else if(!strcmp(argv[2], "--find") || !strcmp(argv[2], "-f")) {
+            if(argc < 4) {
+                fprintf(stderr, "ERROR: Filename is not provided!\n");
+                return 1;
+            }
             FILE *file = fopen(argv[3], "rb");
             if(!file) {
                 fprintf(stderr, "ERROR: Could not open file %s\n", argv[3]);
@@ -57,8 +73,16 @@ int main(int argc, char **argv) {
             return 0;
         }
         // "-i" injecting a custom chunk
-        else if (!strcmp(argv[2], "-i") && argc == 4) {
+        else if (!strcmp(argv[2], "-i") || !strcmp(argv[2], "--inject")) {
+            if(argc < 4) {
+                fprintf(stderr, "ERROR: Filename is not provided!\n");
+                return 1;
+            }
             FILE *file = fopen(argv[3], "rb+");
+            if(!file) {
+                fprintf(stderr, "ERROR: Could not open file %s\n", argv[3]);
+                return 1;
+            }
             printf("You chose to hide information...\n");
             printf("Name the chunk(start with lowercase): ");
             char type[6];
@@ -72,7 +96,11 @@ int main(int argc, char **argv) {
             return 0;
         }
         // -d
-        else if(!strcmp(argv[2], "-d") && argc == 4) {
+        else if(!strcmp(argv[2], "--delete-chunk")|| !strcmp(argv[2], "-d")) {
+            if(argc < 4) {
+                fprintf(stderr, "ERROR: Filename is not provided!\n");
+                return 1;
+            }
             FILE *file = fopen(argv[3], "rb+");
             printf("You chose to delete a chunk...\n");
             printf("Enter the chunk's name: ");
@@ -81,18 +109,6 @@ int main(int argc, char **argv) {
             delete_chunk(file, type);
 
             fclose(file);
-            return 0;
-        }
-        // "--help" help for steg
-        else if(!strcmp(argv[2], "--help") || !strcmp(argv[2], "-h")) {
-            printf("Usage: %s --steg [options] <filename.png>\n", argv[0]);
-            printf("Options:\n");
-            printf("  -f                Finds a hidden injected chunks with its content\n");
-            printf("  -i                Injects a hidden chunk into the file\n");
-            printf("  -d                Delete a chunk by chunk name\n");
-            printf("  -h/--help         See this message\n");
-            printf("Example: %s --steg -f injected.png\n", argv[0]);
-
             return 0;
         }
     }
@@ -241,7 +257,7 @@ int main(int argc, char **argv) {
 
     // Edge detection works better on grayscale
     if((kernel == KERNEL_SOBEL_X || kernel == KERNEL_SOBEL_Y ||
-       kernel == KERNEL_SOBEL_COMBINED || kernel == KERNEL_LAPLACIAN) && !force_grayscale) {
+        kernel == KERNEL_SOBEL_COMBINED || kernel == KERNEL_LAPLACIAN) && !force_grayscale) {
         printf("Note: Edge detection typically works better on grayscale images.\n");
         printf("Consider adding --grayscale flag.\n\n");
     }
