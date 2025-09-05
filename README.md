@@ -99,4 +99,4 @@ The program implements:
 
 ## Author
 
-YerdosNar
+YerdosNar 2025.09.05
