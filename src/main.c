@@ -355,38 +355,33 @@ int main(int argc, char **argv) {
                 uint8_t **processed = allocate_pixel_matrix(image->height, image->width);
                 uint8_t **temp = NULL;
 
-                // Initialize processed matrix
-                for(uint32_t y = 0; y < image->height; y++) {
-                    memcpy(processed[y], grayscale[y], image->width);
-                }
-
-                if(steps > 1) {
-                    temp = allocate_pixel_matrix(image->height, image->width);
-                }
-
                 // Apply convolution
                 if(kernel != KERNEL_NONE) {
                     printf("Applying filter");
-                    if(steps > 1) printf(" (%d steps)", steps);
+                    if(steps > 1) {
+                        printf(" (%d steps)", steps);
+                        temp = allocate_pixel_matrix(image->height, image->width);
+                    }
                     printf("...\n");
 
-                    uint8_t **input = processed;
+                    uint8_t **input = grayscale;
                     uint8_t **output = processed;
 
                     for(uint8_t i = 0; i < steps; i++) {
-                        if(i > 0) {
-                            // Swap buffers for multiple steps
-                            output = (input == processed) ? temp : processed;
-                        }
+                        output = ((steps - 1 - i) % 2 == 0) ? processed : temp;
                         apply_convolution(input, output, image->height, image->width, kernel);
                         input = output;
                     }
 
-                    // Ensure final result is in processed
-                    if(output != processed && temp) {
+                    if(output != processed) {
                         for(uint32_t y = 0; y < image->height; y++) {
                             memcpy(processed[y], output[y], image->width);
                         }
+                    }
+                }
+                else {
+                    for(uint32_t y = 0; y < image->height; y++) {
+                        memcpy(processed[y], grayscale[y], image->width);
                     }
                 }
 

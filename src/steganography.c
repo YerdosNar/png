@@ -63,7 +63,7 @@ bool detect(FILE *file) {
                 } else {
                     read_bytes(file, data, chunk_size);
                     data[chunk_size] = '\0';
-                    printf("   Message: \"%s\"\n", data);
+                    printf("   Message: \"\033[31m%s\033[0m\"\n", data);
                     free(data);
                 }
             } else {

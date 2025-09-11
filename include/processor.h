@@ -35,7 +35,7 @@ typedef enum {
     KERNEL_GAUSSIAN = 3,
     KERNEL_BLUR = 4,
     KERNEL_LAPLACIAN = 5,
-    KERNEL_SHARPEN = 6, 
+    KERNEL_SHARPEN = 6,
     KERNEL_NONE = 7
 } kernel_type;
 
@@ -48,9 +48,9 @@ enum {
 };
 
 uint8_t paeth_predictor(uint8_t left, uint8_t up, uint8_t up_left);
-void unfilter_scanline(uint8_t *current, uint8_t *previous, uint32_t length, uint32_t bit_ppx, uint8_t filter_type);
-image_t *process_idat_chunks(ihdr_t *ihdr, uint8_t *idat_data, uint32_t idat_size);
+void unfilter_scanline(uint8_t *current, const uint8_t *previous, uint32_t length, uint32_t byte_ppx, uint8_t filter_type);
+image_t *process_idat_chunks(ihdr_t *ihdr, uint8_t *idat_data, uint64_t idat_size);
 uint8_t **rgb_to_grayscale(image_t *image);
-void apply_convolution(uint8_t **input, uint8_t **output, uint32_t height, uint32_t width, uint8_t kernel_type);
+void apply_convolution(uint8_t **input, uint8_t **output, uint32_t height, uint32_t width, kernel_type type);
 
 #endif

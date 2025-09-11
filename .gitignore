@@ -1,7 +1,4 @@
 png
-output_file.png
-png_test.png
-out.png
-test.png
+*.png
 obj/
 no_need/
