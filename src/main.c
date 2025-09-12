@@ -295,6 +295,7 @@ int main(int argc, char **argv) {
     printf("Output format: %s\n\n", force_grayscale ? "Grayscale" : "RGB");
 
     ihdr_t ihdr;
+    palette_t palette = { 0 };
     uint8_t *idat_data = NULL;
     uint64_t idat_size = 0;
     uint64_t idat_capacity = 0;
@@ -319,6 +320,22 @@ int main(int argc, char **argv) {
 
             printf("Image dimensions: %u x %u\n", ihdr.width, ihdr.height);
             printf("Bit depth: %u, Color type: %u\n", ihdr.bit_depth, ihdr.color_type);
+        } else if(memcmp(chunk_type, "PLTE", 4) == 0) {
+            palette.entry_count = chunk_size / 3;
+            palette.entries = malloc(chunk_size);
+            if(!palette.entries) {
+                fprintf(stderr, "ERROR: Could not allocate memory for PLTE\n");
+                exit(1);
+            }
+            read_bytes(input_fp, palette.entries, chunk_size);
+        } else if(memcmp(chunk_type, "tRNS", 4) == 0) {
+            palette.alpha_count = chunk_size;
+            palette.alphas = malloc(chunk_size);
+            if(!palette.alphas) {
+                fprintf(stderr, "ERROR: Could not allocate memory for tRNS\n");
+                exit(1);
+            }
+            read_bytes(input_fp, palette.alphas, chunk_size);
         } else if(memcmp(chunk_type, "IDAT", 4) == 0) {
             if(idat_capacity < idat_size + chunk_size) {
                 idat_capacity = (idat_size + chunk_size) * 2;
@@ -346,7 +363,7 @@ int main(int argc, char **argv) {
     // Process the image
     if(idat_data && idat_size > 0) {
         printf("\nProcessing image data...\n");
-        image_t *image = process_idat_chunks(&ihdr, idat_data, idat_size);
+        image_t *image = process_idat_chunks(&ihdr, &palette, idat_data, idat_size);
 
         if(image) {
             if(force_grayscale || image->channels == 1) {
@@ -536,6 +553,9 @@ int main(int argc, char **argv) {
         return 1;
     }
 
+    if(palette.entries) free(palette.entries);
+    if(palette.alphas) free(palette.alphas);
     printf("\nDone!\n");
+
     return 0;
 }

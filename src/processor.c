@@ -64,7 +64,7 @@ void unfilter_scanline(uint8_t *current, const uint8_t *previous, uint32_t lengt
     }
 }
 
-image_t *process_idat_chunks(ihdr_t *ihdr, uint8_t *idat_data, uint64_t idat_size) {
+image_t *process_idat_chunks(ihdr_t *ihdr, palette_t *palette, uint8_t *idat_data, uint64_t idat_size) {
     if (!ihdr || !idat_data || idat_size == 0) {
         fprintf(stderr, "ERROR: Invalid input parameters to process_idat_chunks\n");
         return NULL;
@@ -77,15 +77,19 @@ image_t *process_idat_chunks(ihdr_t *ihdr, uint8_t *idat_data, uint64_t idat_siz
         case 4: channels = 2; break; // Grayscale + Alpha
         case 6: channels = 4; break; // RGB + Alpha
         case 3: // Palette
-            fprintf(stderr, "ERROR: Palette color type (3) is not supported.\n");
-            return NULL;
+            if(!palette || !palette->entries) {
+                fprintf(stderr, "ERROR: Palette (PLTE) chunk missing for color type 3.\n");
+                return NULL;
+            }
+            channels = (palette->alphas) ? 4 : 3;
+            break;
         default:
             fprintf(stderr, "ERROR: Unknown color type: %u\n", ihdr->color_type);
             return NULL;
     }
 
     // Bytes per pixel. Assumes bit depth is 8, which is true for this project.
-    uint32_t bpp = channels;
+    uint32_t bpp = (ihdr->color_type == 3) ? 1 : channels;
 
     // Calculate decompressed data size. Each row is preceded by 1 filter-type byte.
     uLongf decompressed_size = (uLongf)ihdr->height * (1 + (uLongf)ihdr->width * bpp);
@@ -116,26 +120,67 @@ image_t *process_idat_chunks(ihdr_t *ihdr, uint8_t *idat_data, uint64_t idat_siz
     uint32_t scanline_length = ihdr->width * bpp;
     const uint8_t *previous_scanline = NULL;
 
-    for (uint32_t y = 0; y < ihdr->height; y++) {
-        // Calculate the offset to the start of the current scanline in the decompressed buffer.
-        uint64_t offset = y * (1 + scanline_length);
-        uint8_t filter_type = decompressed[offset];
-        uint8_t *scanline = &decompressed[offset + 1];
-
-        if (filter_type > FILTER_PAETH) {
-             fprintf(stderr, "ERROR: Invalid filter type %u at row %u\n", filter_type, y);
-             free_pixel_matrix(image->pixels, image->height);
-             free(image);
-             free(decompressed);
-             return NULL;
+    if(ihdr->color_type == 3) {
+        uint8_t *unfiltered_indices = malloc(ihdr->height * ihdr->width);
+        if(!unfiltered_indices) {
+            fprintf(stderr, "ERROR: Could not allocate for palette indices.\n");
+            free(unfiltered_indices);
+            return NULL;
         }
 
-        unfilter_scanline(scanline, previous_scanline, scanline_length, bpp, filter_type);
+        for(uint32_t y = 0; y < ihdr->height; y++) {
+            uint64_t offset = y * (1 + scanline_length);
+            uint8_t filter_type = decompressed[offset];
+            uint8_t *scanline = &decompressed[offset + 1];
 
-        memcpy(image->pixels[y], scanline, scanline_length);
+            unfilter_scanline(scanline, previous_scanline, scanline_length, bpp, filter_type);
 
-        // FIX: The *unfiltered* current row becomes the previous row for the next iteration.
-        previous_scanline = image->pixels[y];
+            memcpy(unfiltered_indices + (y * ihdr->width), scanline, scanline_length);
+            previous_scanline = unfiltered_indices + (y * ihdr->width);
+        }
+
+        for(uint32_t y = 0; y < ihdr->height; y++) {
+            for(uint32_t x = 0; x < ihdr->width; x++) {
+                uint8_t index = unfiltered_indices[y * ihdr->width + x];
+                if(index >= palette->entry_count) {
+                    fprintf(stderr, "ERROR: Invalid palette index %u at (%u, %u)\n", index, y, x);
+                    index = 0;
+                }
+
+                rgb_t color = palette->entries[index];
+                image->pixels[y][x * channels + 0] = color.r;
+                image->pixels[y][x * channels + 1] = color.g;
+                image->pixels[y][x * channels + 2] = color.b;
+
+                if(channels == 4) {
+                    image->pixels[y][x * channels + 3] = (index < palette->alpha_count) ? palette->alphas[index] : 255;
+                }
+            }
+        }
+        free(unfiltered_indices);
+    }
+    else {
+        for (uint32_t y = 0; y < ihdr->height; y++) {
+            // Calculate the offset to the start of the current scanline in the decompressed buffer.
+            uint64_t offset = y * (1 + scanline_length);
+            uint8_t filter_type = decompressed[offset];
+            uint8_t *scanline = &decompressed[offset + 1];
+
+            if (filter_type > FILTER_PAETH) {
+                fprintf(stderr, "ERROR: Invalid filter type %u at row %u\n", filter_type, y);
+                free_pixel_matrix(image->pixels, image->height);
+                free(image);
+                free(decompressed);
+                return NULL;
+            }
+
+            unfilter_scanline(scanline, previous_scanline, scanline_length, bpp, filter_type);
+
+            memcpy(image->pixels[y], scanline, scanline_length);
+
+            // FIX: The *unfiltered* current row becomes the previous row for the next iteration.
+            previous_scanline = image->pixels[y];
+        }
     }
 
     free(decompressed);

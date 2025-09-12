@@ -14,6 +14,17 @@
 #define PNG_SIG_SIZE 8
 extern const uint8_t png_sig[PNG_SIG_SIZE];
 
+typedef struct {
+    uint8_t r, g, b;
+} rgb_t;
+
+typedef struct {
+    rgb_t *entries;
+    uint8_t *alphas;
+    uint32_t entry_count;
+    uint32_t alpha_count;
+} palette_t;
+
 void read_bytes(FILE *file, void *buffer, size_t size);
 void write_bytes(FILE *file, const void *buffer, size_t size);
 
