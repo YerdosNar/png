@@ -182,9 +182,13 @@ void print_info(FILE *file) {
     }
     printf("PNG File Information:\n");
     print_bytes(signature, PNG_SIG_SIZE);
-    printf("+=============== INFO ================+\n");
+    printf("                 +======+\n");
+    printf(" +================ INFO =================+\n");
+    printf("||               +======+                ||\n");
+    printf("||                                       ||\n");
 
     bool quit = false;
+    bool no_print = false;
     while(!quit) {
         uint32_t chunk_size = read_chunk_size(file);
         uint8_t chunk_type[4];
@@ -192,9 +196,12 @@ void print_info(FILE *file) {
 
         if(chunk_size > 100*1024) {
             float chunk_size_KB = (float)chunk_size / 1024;
-            printf("|Chunk: %.*s (size: %.2f KB)%-8s|\n", (int)sizeof(chunk_type), chunk_type, chunk_size_KB, "");
+            printf("||  Chunk: \033[32m%.*s\033[0m (size: %-3.2f KB)%-8s||\n", (int)sizeof(chunk_type), chunk_type, chunk_size_KB, "");
+        } else if(chunk_size > 1024*1024) {
+            float chunk_size_MB = (float)chunk_size / (1024 * 1024);
+            printf("||  Chunk: \033[32m%.*s\033[0m (size: %-3.2f MB)%-8s||\n", (int)sizeof(chunk_type), chunk_type, chunk_size_MB, "");
         } else {
-            printf("|Chunk: %.*s (size: %.2u B)%-13s|\n", (int)sizeof(chunk_type), chunk_type, chunk_size, "");
+            printf("||  Chunk: \033[32m%.*s\033[0m (size: %-3u B)%-12s||\n", (int)sizeof(chunk_type), chunk_type, chunk_size, "");
         }
 
         if(memcmp(chunk_type, "IHDR", 4) == 0) {
@@ -210,21 +217,22 @@ void print_info(FILE *file) {
             reverse(&ihdr.width, sizeof(ihdr.width));
             reverse(&ihdr.height, sizeof(ihdr.height));
 
-            printf("|  %-12s : %u x %u pixels%-4s|\n", "Dimensions", ihdr.width, ihdr.height, "");
-            printf("|  %-12s : %u%-19s|\n", "Bit depth", ihdr.bit_depth, "");
-            printf("|  %-12s : %u (", "Color type", ihdr.color_type);
+            printf("||                                       ||\n");
+            printf("||    %-12s : %-4u x %-4u pixels%-2s||\n", "Dimensions", ihdr.width, ihdr.height, "");
+            printf("||    %-12s : %u%-19s||\n", "Bit depth", ihdr.bit_depth, "");
+            printf("||    %-12s : %u (", "Color type", ihdr.color_type);
             switch(ihdr.color_type) {
-                case 0: printf("Grayscale"); break;
-                case 2: printf("RGB"); break;
-                case 3: printf("Palette"); break;
-                case 4: printf("Grayscale + Alpha"); break;
-                case 6: printf("RGB + Alpha"); break;
-                default: printf("Unknown");
+                case 0: printf("%-17s", "\e[100mGrayscale\e[0m)       "); break;
+                case 2: printf("%-17s", "\e[1m\033[31mR\033[32mG\033[34mB\033[0m\e[0m)"); break;
+                case 3: printf("%-17s", "Palette)"); break;
+                case 4: printf("%-17s", "Grayscale + Alpha)"); break;
+                case 6: printf("%-17s", "\e[1m\033[31mR\033[32mG\033[34mB\033[0m\e[0m + Alpha)     "); break;
+                default: printf("%-17s", "Unknown)");
             }
-            printf(")%-5s|\n", "");
-            printf("|  %-12s : %u%-19s|\n", "Compression", ihdr.compression, "");
-            printf("|  %-12s : %u%-19s|\n", "Filter", ihdr.filter, "");
-            printf("|  %-12s : %u%-19s|\n", "Interlace", ihdr.interlace, "");
+            printf("||\n");
+            printf("||    %-12s : %u%-19s||\n", "Compression", ihdr.compression, "");
+            printf("||    %-12s : %u%-19s||\n", "Filter", ihdr.filter, "");
+            printf("||    %-12s : %u%-19s||\n", "Interlace", ihdr.interlace, "");
         }
         // else if(memcmp(chunk_type, "tEXt", 4) == 0) {
         //     uint8_t *text_data = malloc(chunk_size + 1);
@@ -235,7 +243,7 @@ void print_info(FILE *file) {
         //         char *keyword = (char*)text_data;
         //         char *text = keyword + strlen(keyword) + 1;
         //         if(text < (char*)text_data + chunk_size) {
-        //             printf("|  Text: %s = %s\n", keyword, text);
+        //             printf("||  Text: %s = %s\n", keyword, text);
         //         }
         //         free(text_data);
         //     } else {
@@ -246,20 +254,26 @@ void print_info(FILE *file) {
             fseek(file, chunk_size, SEEK_CUR);
         }
         else if(memcmp(chunk_type, "IEND", 4) == 0) {
+            no_print = true;
             quit = true;
         }
         else {
             char buffer[chunk_size];
             read_bytes(file, &buffer, sizeof(buffer));
             buffer[chunk_size-1] = '\0';
+            printf("||                                       ||\n");
             if(strlen(buffer) > 25) {
-                printf("| Text: %-27.27s...|\n", buffer);
+                printf("||   Text: \033[33m%-27.27s\033[0m...||\n", buffer);
             }
             else {
-                printf("| Text: %-30s|\n", buffer);
+                printf("||   Text: \033[33m%-30s\033[0m||\n", buffer);
             }
         }
-        printf("+=====================================+\n");
+        printf("||                                       ||\n");
+        printf(" +=======================================+\n");
+        if(!no_print) {
+            printf("||                                       ||\n");
+        }
 
         read_chunk_crc(file);
     }
