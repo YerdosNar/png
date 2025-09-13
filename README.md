@@ -76,7 +76,7 @@ Sharpen an image:
 - ✅ RGB (24-bit)
 - ✅ RGBA (32-bit with alpha)
 - ✅ Grayscale + Alpha
-- ❌ Indexed/Palette images
+- ✅ Indexed/Palette images
 - ❌ Interlaced PNGs
 - ❌ 16-bit depth images
 

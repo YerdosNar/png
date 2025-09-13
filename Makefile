@@ -3,6 +3,7 @@ RESET	:= \033[0m
 RED		:= \033[31m
 GREEN	:= \033[32m
 BLUE	:= \033[34m
+BOLD	:= \e[1m
 
 # body
 CC		= gcc
@@ -24,9 +25,9 @@ $(TARGET): $(OBJECTS)
 	@printf "%b\n" "$(GREEN)===> Linking...$(RESET)"
 	$(CC) $^ -o $@ $(LDFLAGS)
 	@printf "%b\n" "$(GREEN)===> Build finished successfully: $(RESET)✅"
-	@printf "%b\n" "$(RED)            vvvvvvvvv$(RESET)"
-	@printf "%b\n" "$(RED)            ==>$(TARGET)<==$(RESET)"
-	@printf "%b\n" "$(RED)            ^^^^^^^^^$(RESET)"
+	@printf "%b\n" "$(BLUE)            vvvvvvvvv$(RESET)"
+	@printf "%b\n" "$(BLUE)            ==>$(RED)$(BOLD)$(TARGET)$(RESET)$(BLUE)<==$(RESET)"
+	@printf "%b\n" "$(BLUE)            ^^^^^^^^^$(RESET)"
 
 $(OBJDIR)/%.o: $(SRCDIR)/%.c
 	@mkdir -p $(OBJDIR)

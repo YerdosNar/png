@@ -235,13 +235,31 @@ void apply_convolution(uint8_t **input, uint8_t **output, uint32_t height, uint3
     }
 
     float kernels[7][3][3] = {
-        [KERNEL_SOBEL_X]        = {{-1, 0, 1}, {-2, 0, 2}, {-1, 0, 1}},
-        [KERNEL_SOBEL_Y]        = {{-1, -2, -1}, {0, 0, 0}, {1, 2, 1}},
+        [KERNEL_SOBEL_X]        = {{-1, 0, 1},
+                                   {-2, 0, 2},
+                                   {-1, 0, 1}},
+
+        [KERNEL_SOBEL_Y]        = {{-1, -2, -1},
+                                   {0, 0, 0},
+                                   {1, 2, 1}},
+
         [KERNEL_SOBEL_COMBINED] = {{0}}, // Handled as a special case
-        [KERNEL_GAUSSIAN]       = {{1/16.f, 2/16.f, 1/16.f}, {2/16.f, 4/16.f, 2/16.f}, {1/16.f, 2/16.f, 1/16.f}},
-        [KERNEL_BLUR]           = {{1/9.f, 1/9.f, 1/9.f}, {1/9.f, 1/9.f, 1/9.f}, {1/9.f, 1/9.f, 1/9.f}},
-        [KERNEL_LAPLACIAN]      = {{0, -1, 0}, {-1, 4, -1}, {0, -1, 0}},
-        [KERNEL_SHARPEN]        = {{0, -1, 0}, {-1, 5, -1}, {0, -1, 0}}
+
+        [KERNEL_GAUSSIAN]       = {{1/16.f, 2/16.f, 1/16.f},
+                                   {2/16.f, 4/16.f, 2/16.f},
+                                   {1/16.f, 2/16.f, 1/16.f}},
+
+        [KERNEL_BLUR]           = {{1/9.f, 1/9.f, 1/9.f},
+                                   {1/9.f, 1/9.f, 1/9.f},
+                                   {1/9.f, 1/9.f, 1/9.f}},
+
+        [KERNEL_LAPLACIAN]      = {{0, -1, 0},
+                                   {-1, 4, -1},
+                                   {0, -1, 0}},
+
+        [KERNEL_SHARPEN]        = {{0, -1, 0},
+                                   {-1, 5, -1},
+                                   {0, -1, 0}}
     };
 
     // Iterate over the inner pixels, avoiding the 1-pixel border

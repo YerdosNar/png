@@ -48,9 +48,9 @@ int main(int argc, char **argv) {
         if(argc < 3 || (!strcmp(argv[2], "--help") || !strcmp(argv[2], "-h"))) {
             printf("Usage: %s --steg [options] <filename.png>\n", argv[0]);
             printf("\nOptions:\n");
-            printf("  -f                        Finds a hidden injected chunks with its content\n");
-            printf("  -i                        Injects a hidden chunk into the file\n");
-            printf("  -d                        Delete a chunk by chunk name\n");
+            printf("  -f/--find                                Finds hidden injected chunks with its content\n");
+            printf("  -i/--inject                              Injects a hidden chunk into the file\n");
+            printf("  -d/--delete-chunk                        Delete a chunk by chunk name\n");
             printf("  -h/--help                 See this message\n");
             printf("Example: %s --steg -f injected.png\n", argv[0]);
 
@@ -136,7 +136,7 @@ int main(int argc, char **argv) {
                     fprintf(stderr, "ERROR: Could not open file %s\n", input_file);
                     return 1;
                 }
-                print_info(file);
+                print_info(file, input_file);
                 fclose(file);
                 return 0;
             } else if(!strcmp(argv[i], "-o") || !strcmp(argv[i], "--output")) {

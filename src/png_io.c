@@ -4,10 +4,10 @@
 const uint8_t png_sig[PNG_SIG_SIZE] = {137, 80, 78, 71, 13, 10, 26, 10};
 
 void print_bytes(uint8_t *buffer, size_t buffer_size) {
-    for(size_t i = 0; i < buffer_size; i++) {
+    for(size_t i = 0; i < buffer_size-1; i++) {
         printf("%u ", buffer[i]);
     }
-    printf("\n");
+    printf("%u\n", buffer[buffer_size-1]);
 }
 
 void read_bytes(FILE *file, void *buffer, size_t size) {
@@ -172,7 +172,7 @@ void save_png(const char *filename, uint8_t **pixels,
     printf("Successfully saved output image to: %s\n", filename);
 }
 
-void print_info(FILE *file) {
+void print_info(FILE *file, char *filename) {
     uint8_t signature[PNG_SIG_SIZE];
     read_bytes(file, signature, PNG_SIG_SIZE);
     if(memcmp(signature, png_sig, PNG_SIG_SIZE) != 0) {
@@ -180,9 +180,10 @@ void print_info(FILE *file) {
         fclose(file);
         exit(1);
     }
-    printf("PNG File Information:\n");
+    printf("PNG File Name: \033[32m%s\033[0m\n", filename);
+    printf("PNG Signature: \033[32m");
     print_bytes(signature, PNG_SIG_SIZE);
-    printf("                 +======+\n");
+    printf("\033[0m                 +======+\n");
     printf(" +================ INFO =================+\n");
     printf("||               +======+                ||\n");
     printf("||                                       ||\n");
@@ -250,7 +251,9 @@ void print_info(FILE *file) {
         //         fseek(file, chunk_size, SEEK_CUR);
         //     }
         // }
-        else if(memcmp(chunk_type, "IDAT", 4) == 0) {
+        else if((memcmp(chunk_type, "PLTE", 4) == 0) ||
+                (memcmp(chunk_type, "tRNS", 4) == 0) ||
+                (memcmp(chunk_type, "IDAT", 4) == 0)) {
             fseek(file, chunk_size, SEEK_CUR);
         }
         else if(memcmp(chunk_type, "IEND", 4) == 0) {

@@ -50,7 +50,7 @@ bool detect(FILE *file) {
         read_chunk_type(file, chunk_type);
 
         // Check for private, ancillary chunk (first letter is lowercase)
-        if(chunk_type[0] >= 'a' && chunk_type[0] <= 'z') {
+        if(chunk_type[0] >= 'a' && chunk_type[0] <= 'z' && memcmp(chunk_type, "tRNS", 4) != 0) {
             found_hidden_chunk = true;
             printf("\n✅ Found hidden chunk: \033[31m%s\033[0m\n", chunk_type);
             printf("   Length: %u bytes\n", chunk_size);
