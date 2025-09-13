@@ -92,11 +92,10 @@ The program implements:
 ## Known Issues
 
 - Currently only supports 8-bit depth images
-- No support for palette-based PNGs
 - Interlaced PNG files are not supported
 - Border pixels use simple replication for convolution
 
 
 ## Author
 
-YerdosNar 2025.09.05
+YerdosNar 2025.09.14
