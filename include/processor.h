@@ -52,5 +52,7 @@ void unfilter_scanline(uint8_t *current, const uint8_t *previous, uint32_t lengt
 image_t *process_idat_chunks(ihdr_t *ihdr, palette_t *palette, uint8_t *idat_data, uint64_t idat_size);
 uint8_t **rgb_to_grayscale(image_t *image);
 void apply_convolution(uint8_t **input, uint8_t **output, uint32_t height, uint32_t width, kernel_type type);
+uint8_t **upscale(uint8_t **input, uint32_t height, uint32_t width);
+uint8_t **bilinear_upscale(uint8_t **input, uint32_t height, uint32_t width, float scale_factor);
 
 #endif

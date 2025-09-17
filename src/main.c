@@ -7,19 +7,20 @@
 void usage(char *exec_name) {
     printf("Usage: %s <input.png> -o <output.png> [options]\n", exec_name);
     printf("\nOptions: \n");
-    printf("  -o, --output <file>    Output filename (default=out.png)\n");
-    printf("  -i, --info <file>      Show information about PNG file\n");
-    printf("  -g, --grayscale        Convert to grayscale\n");
-    printf("  -c, --color            Keep RGB format (default)\n");
-    printf("  --sobel-x              Apply Sobel X edge detection\n");
-    printf("  --sobel-y              Apply Sobel Y edge detection\n");
-    printf("  --sobel                Apply combined Sobel edge detection\n");
-    printf("  --gaussian [steps]     Apply Gaussian blur (optional: number of iterations, default=1)\n");
-    printf("  --blur [steps]         Apply box blur (optional: number of iterations, default=1)\n");
-    printf("  --laplacian            Apply Laplacian edge detection\n");
-    printf("  --sharpen              Apply sharpening filter\n");
-    printf("  --none                 No filter (default)\n");
-    printf("  -h, --help             Show this HELP message\n");
+    printf("  -o,  --output <file>        Output filename (default=out.png)\n");
+    printf("  -i,  --info <file>          Show information about PNG file\n");
+    printf("  -g,  --grayscale            Convert to grayscale\n");
+    printf("  -c,  --color                Keep RGB format (default)\n");
+    printf("  -x,  --sobel-x              Apply Sobel X edge detection\n");
+    printf("  -y,  --sobel-y              Apply Sobel Y edge detection\n");
+    printf("  -s,  --sobel                Apply combined Sobel edge detection\n");
+    printf("  --gaussian [steps]          Apply Gaussian blur (optional: number of iterations, default=1)\n");
+    printf("  -b,  --blur [steps]         Apply box blur (optional: number of iterations, default=1)\n");
+    printf("  -l,  --laplacian            Apply Laplacian edge detection\n");
+    printf("  -sh, --sharpen              Apply sharpening filter\n");
+    printf("  -u,  --upscale              Upscale the image\n");
+    printf("  --none                      No filter (default)\n");
+    printf("  -h, --help                  Show this HELP message\n");
     printf("\nExamples:\n");
     printf("  %s input.png -o edges.png --sobel --grayscale\n", exec_name);
     printf("  %s photo.png -o blurred.png --gaussian\n", exec_name);
@@ -37,10 +38,12 @@ int main(int argc, char **argv) {
     char *input_file = NULL;
     char *output_file = NULL;
     bool force_grayscale = false;
+    bool do_upscale = false;
     bool conflict = false;
     bool conflict_kernel = false;
     kernel_type kernel = KERNEL_NONE;
     uint8_t steps = 0;
+    float scale_factor = 0.0f;
 
     // Hidde option, not listed in the usage info
     if(!strcmp(argv[1], "--steg")) {
@@ -52,7 +55,8 @@ int main(int argc, char **argv) {
             printf("  -i/--inject                              Injects a hidden chunk into the file\n");
             printf("  -d/--delete-chunk                        Delete a chunk by chunk name\n");
             printf("  -h/--help                 See this message\n");
-            printf("Example: %s --steg -f injected.png\n", argv[0]);
+            printf("\nExample: \n");
+            printf("         %s --steg -f injected.png\n", argv[0]);
 
             return 0;
         }
@@ -162,7 +166,7 @@ int main(int argc, char **argv) {
                     fprintf(stderr, "ERROR: RGB and Grayscale both cannot be set\n");
                     return 1;
                 }
-            } else if(!strcmp(argv[i], "--sobel-x")) {
+            } else if(!(strcmp(argv[i], "-x")) || (!strcmp(argv[i], "--sobel-x"))) {
                 if(!conflict_kernel) {
                     conflict_kernel = true;
                     kernel = KERNEL_SOBEL_X;
@@ -170,7 +174,7 @@ int main(int argc, char **argv) {
                     fprintf(stderr, "ERROR: Two or more kernels chosen\n");
                     return 1;
                 }
-            } else if(!strcmp(argv[i], "--sobel-y")) {
+            } else if(!(strcmp(argv[i], "-y")) || (!strcmp(argv[i], "--sobel-y"))) {
                 if(!conflict_kernel) {
                     conflict_kernel = true;
                     kernel = KERNEL_SOBEL_Y;
@@ -178,7 +182,7 @@ int main(int argc, char **argv) {
                     fprintf(stderr, "ERROR: Two or more kernels chosen\n");
                     return 1;
                 }
-            } else if(!strcmp(argv[i], "--sobel")) {
+            } else if(!strcmp(argv[i], "-s") || !strcmp(argv[i], "--sobel")) {
                 if(!conflict_kernel) {
                     conflict_kernel = true;
                     kernel = KERNEL_SOBEL_COMBINED;
@@ -197,7 +201,7 @@ int main(int argc, char **argv) {
                     fprintf(stderr, "ERROR: Two or more kernels chosen\n");
                     return 1;
                 }
-            } else if(!strcmp(argv[i], "--blur")) {
+            } else if(!strcmp(argv[i], "-b") || !strcmp(argv[i], "--blur")) {
                 if(!conflict_kernel) {
                     conflict_kernel = true;
                     kernel = KERNEL_BLUR;
@@ -208,7 +212,7 @@ int main(int argc, char **argv) {
                     fprintf(stderr, "ERROR: Two or more kernels chosen\n");
                     return 1;
                 }
-            } else if(!strcmp(argv[i], "--laplacian")) {
+            } else if(!strcmp(argv[i], "-l") || !strcmp(argv[i], "--laplacian")) {
                 if(!conflict_kernel) {
                     conflict_kernel = true;
                     kernel = KERNEL_LAPLACIAN;
@@ -216,7 +220,7 @@ int main(int argc, char **argv) {
                     fprintf(stderr, "ERROR: Two or more kernels chosen\n");
                     return 1;
                 }
-            } else if(!strcmp(argv[i], "--sharpen")) {
+            } else if(!strcmp(argv[i], "-sh") || !strcmp(argv[i], "--sharpen")) {
                 if(!conflict_kernel) {
                     conflict_kernel = true;
                     kernel = KERNEL_SHARPEN;
@@ -230,6 +234,23 @@ int main(int argc, char **argv) {
                     kernel = KERNEL_NONE;
                 } else {
                     fprintf(stderr, "ERROR: Two or more kernels chosen\n");
+                    return 1;
+                }
+            } else if(!strcmp(argv[i], "-u") || !strcmp(argv[i], "--upscale")) {
+                // TODO: Complete if the user chooses to upscale
+                if(!conflict_kernel) {
+                    conflict_kernel = true;
+                    do_upscale = true;
+                    kernel = KERNEL_NONE;
+                    if(i + 1 < argc && (argv[i+1][0] >= '0' && argv[i+1][0] <= '9')) {
+                        scale_factor = strtof(argv[++i], NULL);
+                        if(scale_factor <= 0.0f || scale_factor > 15.0f) {
+                            fprintf(stderr, "ERROR: Invalid scale_factor...Must between [1.0 ~ 15.0]\n");
+                            return 1;
+                        }
+                    }
+                } else {
+                    fprintf(stderr, "ERROR: Upscale cannot be combined with other kernel.\n");
                     return 1;
                 }
             } else if(strstr(argv[i], ".png") != NULL && input_file == NULL) {
@@ -366,7 +387,63 @@ int main(int argc, char **argv) {
         image_t *image = process_idat_chunks(&ihdr, &palette, idat_data, idat_size);
 
         if(image) {
-            if(force_grayscale || image->channels == 1) {
+            if (do_upscale) {
+                printf("Upscaling image by a factor of %.2f...\n", scale_factor);
+                // Calculate new dimensions using the scale_factor, rounding for accuracy
+                uint32_t new_width = (uint32_t)roundf(image->width * scale_factor);
+                uint32_t new_height = (uint32_t)roundf(image->height * scale_factor);
+
+                if (force_grayscale || image->channels == 1) {
+                    uint8_t **grayscale = rgb_to_grayscale(image);
+                    uint8_t **upscaled_pixels = bilinear_upscale(grayscale, image->height, image->width, scale_factor);
+
+                    save_png(output_file, upscaled_pixels, new_width, new_height, 0, 1);
+
+                    if (grayscale != image->pixels) {
+                        free_pixel_matrix(grayscale, image->height);
+                    }
+                    free_pixel_matrix(upscaled_pixels, new_height);
+                } else { // Handle color images
+                    uint8_t **processed = allocate_pixel_matrix(new_height, new_width * image->channels);
+
+                    // Upscale each color channel (R, G, B) separately
+                    for (uint32_t ch = 0; ch < 3; ch++) {
+                        uint8_t **channel = allocate_pixel_matrix(image->height, image->width);
+                        for (uint32_t y = 0; y < image->height; y++) {
+                            for (uint32_t x = 0; x < image->width; x++) {
+                                channel[y][x] = image->pixels[y][x * image->channels + ch];
+                            }
+                        }
+
+                        uint8_t **upscaled_channel = bilinear_upscale(channel, image->height, image->width, scale_factor);
+
+                        // Recombine the upscaled channel into the final image
+                        for (uint32_t y = 0; y < new_height; y++) {
+                            for (uint32_t x = 0; x < new_width; x++) {
+                                processed[y][x * image->channels + ch] = upscaled_channel[y][x];
+                            }
+                        }
+                        free_pixel_matrix(channel, image->height);
+                        free_pixel_matrix(upscaled_channel, new_height);
+                    }
+
+                    // Copy alpha channel if it exists (using nearest-neighbor for simplicity)
+                    if (image->channels == 4) {
+                        for (uint32_t y = 0; y < new_height; y++) {
+                            for (uint32_t x = 0; x < new_width; x++) {
+                                uint32_t orig_y = (uint32_t)fmin(roundf(y / scale_factor), image->height - 1);
+                                uint32_t orig_x = (uint32_t)fmin(roundf(x / scale_factor), image->width - 1);
+                                processed[y][x * 4 + 3] = image->pixels[orig_y][orig_x * 4 + 3];
+                            }
+                        }
+                    }
+
+                    uint8_t color_type = (image->channels == 4) ? 6 : 2;
+                    save_png(output_file, processed, new_width, new_height, color_type, image->channels);
+                    free_pixel_matrix(processed, new_height);
+                }
+            }
+            else if(force_grayscale || image->channels == 1) {
                 // Convert to grayscale if needed
                 uint8_t **grayscale = rgb_to_grayscale(image);
                 uint8_t **processed = allocate_pixel_matrix(image->height, image->width);

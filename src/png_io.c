@@ -195,12 +195,12 @@ void print_info(FILE *file, char *filename) {
         uint8_t chunk_type[4];
         read_chunk_type(file, chunk_type);
 
-        if(chunk_size > 100*1024) {
+        if(chunk_size > 1024*1024) {
+            float chunk_size_MB = (float)chunk_size / (1024 * 1024);
+            printf("||  Chunk: \033[32m%.*s\033[0m (size: %-3.2f MB)%-9s||\n", (int)sizeof(chunk_type), chunk_type, chunk_size_MB, "");
+        } else if(chunk_size > 100*1024) {
             float chunk_size_KB = (float)chunk_size / 1024;
             printf("||  Chunk: \033[32m%.*s\033[0m (size: %-3.2f KB)%-8s||\n", (int)sizeof(chunk_type), chunk_type, chunk_size_KB, "");
-        } else if(chunk_size > 1024*1024) {
-            float chunk_size_MB = (float)chunk_size / (1024 * 1024);
-            printf("||  Chunk: \033[32m%.*s\033[0m (size: %-3.2f MB)%-8s||\n", (int)sizeof(chunk_type), chunk_type, chunk_size_MB, "");
         } else {
             printf("||  Chunk: \033[32m%.*s\033[0m (size: %-3u B)%-12s||\n", (int)sizeof(chunk_type), chunk_type, chunk_size, "");
         }

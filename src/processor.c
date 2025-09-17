@@ -299,3 +299,99 @@ void apply_convolution(uint8_t **input, uint8_t **output, uint32_t height, uint3
     }
 }
 
+// Just upscaling. Nothing more
+uint8_t **upscale(uint8_t **input, uint32_t height, uint32_t width) {
+    if(!input) {
+        return NULL;
+    }
+
+    uint32_t new_h = height * 3;
+    uint32_t new_w = width * 3;
+    uint8_t **output = allocate_pixel_matrix(new_h, new_w);
+    if(!output) {
+        fprintf(stderr, "ERROR: Could not allocate memory for output in upscale()\n");
+        return NULL;
+    }
+
+    for(uint32_t y = 0; y < height; y++) {
+        for(uint32_t x = 0; x < width; x++) {
+            uint8_t pixel_value = input[y][x];
+            for(uint8_t ky = 0; ky < 3; ky++) {
+                for(uint8_t kx = 0; kx < 3; kx++) {
+                    output[y * 3 + ky][x * 3 + kx] = pixel_value;
+                }
+            }
+        }
+    }
+    // apply_convolution(output, output, new_h, new_w, KERNEL_SHARPEN);
+
+    return output;
+}
+
+/**
+ * Upscales a single-channel image by a factor of 3 using bilinear interpolation.
+ *
+ * @param input The input pixel matrix (grayscale).
+ * @param height The height of the input image.
+ * @param width The width of the input image.
+ * @return A new, upscaled pixel matrix, or NULL on failure.
+ */
+uint8_t **bilinear_upscale(uint8_t **input, uint32_t height, uint32_t width, float scale_factor) {
+    if (!input) {
+        return NULL;
+    }
+
+    uint32_t new_height = height * (int)(scale_factor);
+    uint32_t new_width = width * (int)(scale_factor);
+
+    uint8_t **output = allocate_pixel_matrix(new_height, new_width);
+    if (!output) {
+        fprintf(stderr, "ERROR: Could not allocate memory for bilinear upscale output\n");
+        return NULL;
+    }
+
+    for (uint32_t y_new = 0; y_new < new_height; y_new++) {
+        for (uint32_t x_new = 0; x_new < new_width; x_new++) {
+            // Map the new pixel's coordinates back to the original image
+            float x_orig = (x_new + 0.5f) / scale_factor - 0.5f;
+            float y_orig = (y_new + 0.5f) / scale_factor - 0.5f;
+
+            // Get the integer coordinates of the top-left surrounding pixel
+            int x1 = (int)floor(x_orig);
+            int y1 = (int)floor(y_orig);
+
+            // Handle edge cases by clamping coordinates
+            if (x1 < 0) x1 = 0;
+            if (y1 < 0) y1 = 0;
+            if (x1 >= width - 1) x1 = width - 2;
+            if (y1 >= height - 1) y1 = height - 2;
+
+            // Coordinates of the other 3 surrounding pixels
+            int x2 = x1 + 1;
+            int y2 = y1 + 1;
+
+            // Get the pixel values of the four neighbors
+            uint8_t Q11 = input[y1][x1]; // Top-left
+            uint8_t Q21 = input[y1][x2]; // Top-right
+            uint8_t Q12 = input[y2][x1]; // Bottom-left
+            uint8_t Q22 = input[y2][x2]; // Bottom-right
+
+            // Calculate the fractional distances (weights)
+            float x_frac = x_orig - x1;
+            float y_frac = y_orig - y1;
+
+            // Interpolate horizontally
+            float R1 = Q11 * (1.0f - x_frac) + Q21 * x_frac; // Top edge
+            float R2 = Q12 * (1.0f - x_frac) + Q22 * x_frac; // Bottom edge
+
+            // Interpolate vertically and clamp the final value
+            float value = R1 * (1.0f - y_frac) + R2 * y_frac;
+            if (value > 255.0f) value = 255.0f;
+            if (value < 0.0f) value = 0.0f;
+
+            output[y_new][x_new] = (uint8_t)value;
+        }
+    }
+
+    return output;
+}
