@@ -11,6 +11,7 @@ A lightweight C program for reading, processing, and filtering PNG images with s
   - Box blur
   - Laplacian edge detection
   - Image sharpening
+  - Image upscaling
 - **Color Space Conversion**: Convert between RGB and grayscale
 - **Preserves Alpha Channel**: Maintains transparency information when processing RGBA images
 
@@ -43,13 +44,14 @@ make
 - `-o, --output <file>` - Output filename (default: out.png)
 - `-g, --grayscale` - Convert to grayscale
 - `-c, --color` - Keep RGB format (default)
-- `--sobel-x` - Apply Sobel X edge detection
-- `--sobel-y` - Apply Sobel Y edge detection
-- `--sobel` - Apply combined Sobel edge detection
-- `--gaussian` - Apply Gaussian blur
-- `--blur` - Apply box blur
-- `--laplacian` - Apply Laplacian edge detection
-- `--sharpen` - Apply sharpening filter
+- `-x, --sobel-x` - Apply Sobel X edge detection
+- `-y, --sobel-y` - Apply Sobel Y edge detection
+- `-s, --sobel` - Apply combined Sobel edge detection
+- `--gaussian [steps]` - Apply Gaussian blur
+- `-b, --blur [steps]` - Apply box blur
+- `-l, --laplacian` - Apply Laplacian edge detection
+- `-sh,--sharpen` - Apply sharpening filter
+- `-u,--upscale [scale_factor]` - Apply sharpening filter (Bilinear)
 - `--none` - No filter (default)
 - `-h, --help` - Show help message
 
@@ -98,4 +100,4 @@ The program implements:
 
 ## Author
 
-YerdosNar 2025.09.14
+YerdosNar 2025.09.18
