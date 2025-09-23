@@ -173,6 +173,10 @@ void save_png(const char *filename, uint8_t **pixels,
 }
 
 void print_info(FILE *file, char *filename) {
+    rewind(file);
+    fseek(file, 0, SEEK_END);
+    uint32_t total_size = ftell(file);
+    rewind(file);
     uint8_t signature[PNG_SIG_SIZE];
     read_bytes(file, signature, PNG_SIG_SIZE);
     if(memcmp(signature, png_sig, PNG_SIG_SIZE) != 0) {
@@ -180,9 +184,18 @@ void print_info(FILE *file, char *filename) {
         fclose(file);
         exit(1);
     }
-    printf("PNG File Name: \033[32m%s\033[0m\n", filename);
-    printf("PNG Signature: \033[32m");
+
+    printf("PNG File Name : \033[32m%s\033[0m\n", filename);
+    printf("PNG Signature : \033[32m");
     print_bytes(signature, PNG_SIG_SIZE);
+    printf("\033[0m");
+    if(total_size > 1024*1024) {
+        printf("PNG Total Size: \033[32m%.2f KB\n", (float)(total_size)/(1024*1024));
+    } else if(total_size > 1024) {
+        printf("PNG Total Size: \033[32m%.2f KB\n", (float)(total_size)/1024);
+    } else {
+        printf("PNG Total Size: \033[32m%u B\n", total_size);
+    }
     printf("\033[0m                 +======+\n");
     printf(" +================ INFO =================+\n");
     printf("||               +======+                ||\n");
@@ -198,9 +211,9 @@ void print_info(FILE *file, char *filename) {
         if(chunk_size > 1024*1024) {
             float chunk_size_MB = (float)chunk_size / (1024 * 1024);
             printf("||  Chunk: \033[32m%.*s\033[0m (size: %-3.2f MB)%-9s||\n", (int)sizeof(chunk_type), chunk_type, chunk_size_MB, "");
-        } else if(chunk_size > 100*1024) {
+        } else if(chunk_size > 1024) {
             float chunk_size_KB = (float)chunk_size / 1024;
-            printf("||  Chunk: \033[32m%.*s\033[0m (size: %-3.2f KB)%-8s||\n", (int)sizeof(chunk_type), chunk_type, chunk_size_KB, "");
+            printf("||  Chunk: \033[32m%.*s\033[0m (size: %-3.2f KB)%-10s||\n", (int)sizeof(chunk_type), chunk_type, chunk_size_KB, "");
         } else {
             printf("||  Chunk: \033[32m%.*s\033[0m (size: %-3u B)%-12s||\n", (int)sizeof(chunk_type), chunk_type, chunk_size, "");
         }
@@ -224,7 +237,7 @@ void print_info(FILE *file, char *filename) {
             printf("||    %-12s : %u (", "Color type", ihdr.color_type);
             switch(ihdr.color_type) {
                 case 0: printf("%-17s", "\e[100mGrayscale\e[0m)       "); break;
-                case 2: printf("%-17s", "\e[1m\033[31mR\033[32mG\033[34mB\033[0m\e[0m)"); break;
+                case 2: printf("%-17s", "\e[1m\033[31mR\033[32mG\033[34mB\033[0m\e[0m)             "); break;
                 case 3: printf("%-17s", "Palette)"); break;
                 case 4: printf("%-17s", "Grayscale + Alpha)"); break;
                 case 6: printf("%-17s", "\e[1m\033[31mR\033[32mG\033[34mB\033[0m\e[0m + Alpha)     "); break;
@@ -253,6 +266,7 @@ void print_info(FILE *file, char *filename) {
         // }
         else if((memcmp(chunk_type, "PLTE", 4) == 0) ||
                 (memcmp(chunk_type, "tRNS", 4) == 0) ||
+                (memcmp(chunk_type, "pHYs", 4) == 0) ||
                 (memcmp(chunk_type, "IDAT", 4) == 0)) {
             fseek(file, chunk_size, SEEK_CUR);
         }

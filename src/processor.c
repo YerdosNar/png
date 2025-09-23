@@ -363,8 +363,8 @@ uint8_t **bilinear_upscale(uint8_t **input, uint32_t height, uint32_t width, flo
             // Handle edge cases by clamping coordinates
             if (x1 < 0) x1 = 0;
             if (y1 < 0) y1 = 0;
-            if (x1 >= width - 1) x1 = width - 2;
-            if (y1 >= height - 1) y1 = height - 2;
+            if ((uint32_t)x1 >= width - 1) x1 = width - 2;
+            if ((uint32_t)y1 >= height - 1) y1 = height - 2;
 
             // Coordinates of the other 3 surrounding pixels
             int x2 = x1 + 1;
