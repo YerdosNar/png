@@ -25,6 +25,16 @@ typedef struct {
     uint32_t alpha_count;
 } palette_t;
 
+typedef struct {
+    uint32_t width;
+    uint32_t height;
+    uint8_t bit_depth;
+    uint8_t color_type;
+    uint8_t compression;
+    uint8_t filter;
+    uint8_t interlace;
+} ihdr_t;
+
 void read_bytes(FILE *file, void *buffer, size_t size);
 void write_bytes(FILE *file, const void *buffer, size_t size);
 
@@ -41,5 +51,19 @@ void write_chunk(FILE *file, const char type[], uint8_t *data, uint32_t length_l
 
 void save_png(const char *filename, uint8_t **pixels, uint32_t width, uint32_t height, uint8_t color_type, uint32_t channels);
 void print_info(FILE *file, char *filename);
+
+// Structure to hold PNG data read from file
+typedef struct {
+    ihdr_t ihdr;
+    palette_t palette;
+    uint8_t *idat_data;
+    uint64_t idat_size;
+} png_data_t;
+
+// Read and parse PNG file
+bool read_png_file(const char *filename, png_data_t *png_data);
+
+// Free PNG data resources
+void free_png_data(png_data_t *png_data);
 
 #endif
