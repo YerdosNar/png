@@ -100,4 +100,4 @@ The program implements:
 
 ## Author
 
-YerdosNar 2025.09.18
+YerdosNar 2025.10.17
