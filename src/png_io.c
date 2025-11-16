@@ -172,6 +172,109 @@ void save_png(const char *filename, uint8_t **pixels,
     printf("Successfully saved output image to: %s\n", filename);
 }
 
+bool read_png_file(const char *filename, png_data_t *png_data) {
+    // Initialize png_data structure
+    memset(png_data, 0, sizeof(png_data_t));
+    
+    FILE *input_fp = fopen(filename, "rb");
+    if (!input_fp) {
+        fprintf(stderr, "ERROR: Could not open input file %s\n", filename);
+        return false;
+    }
+
+    // Check PNG signature
+    uint8_t signature[PNG_SIG_SIZE];
+    read_bytes(input_fp, signature, PNG_SIG_SIZE);
+    if (memcmp(signature, png_sig, PNG_SIG_SIZE) != 0) {
+        fprintf(stderr, "ERROR: %s is not a PNG file\n", filename);
+        fclose(input_fp);
+        return false;
+    }
+
+    printf("Processing: %s\n", filename);
+
+    uint64_t idat_capacity = 0;
+    bool quit = false;
+
+    while (!quit) {
+        uint32_t chunk_size = read_chunk_size(input_fp);
+        uint8_t chunk_type[4];
+        read_chunk_type(input_fp, chunk_type);
+
+        if (memcmp(chunk_type, "IHDR", 4) == 0) {
+            read_bytes(input_fp, &png_data->ihdr.width, 4);
+            read_bytes(input_fp, &png_data->ihdr.height, 4);
+            read_bytes(input_fp, &png_data->ihdr.bit_depth, 1);
+            read_bytes(input_fp, &png_data->ihdr.color_type, 1);
+            read_bytes(input_fp, &png_data->ihdr.compression, 1);
+            read_bytes(input_fp, &png_data->ihdr.filter, 1);
+            read_bytes(input_fp, &png_data->ihdr.interlace, 1);
+
+            reverse(&png_data->ihdr.width, sizeof(png_data->ihdr.width));
+            reverse(&png_data->ihdr.height, sizeof(png_data->ihdr.height));
+
+            printf("Image dimensions: %u x %u\n", png_data->ihdr.width, png_data->ihdr.height);
+            printf("Bit depth: %u, Color type: %u\n", png_data->ihdr.bit_depth, png_data->ihdr.color_type);
+        } else if (memcmp(chunk_type, "PLTE", 4) == 0) {
+            png_data->palette.entry_count = chunk_size / 3;
+            png_data->palette.entries = malloc(chunk_size);
+            if (!png_data->palette.entries) {
+                fprintf(stderr, "ERROR: Could not allocate memory for PLTE\n");
+                fclose(input_fp);
+                return false;
+            }
+            read_bytes(input_fp, png_data->palette.entries, chunk_size);
+        } else if (memcmp(chunk_type, "tRNS", 4) == 0) {
+            png_data->palette.alpha_count = chunk_size;
+            png_data->palette.alphas = malloc(chunk_size);
+            if (!png_data->palette.alphas) {
+                fprintf(stderr, "ERROR: Could not allocate memory for tRNS\n");
+                fclose(input_fp);
+                return false;
+            }
+            read_bytes(input_fp, png_data->palette.alphas, chunk_size);
+        } else if (memcmp(chunk_type, "IDAT", 4) == 0) {
+            if (idat_capacity < png_data->idat_size + chunk_size) {
+                idat_capacity = (png_data->idat_size + chunk_size) * 2;
+                uint8_t *new_idat_data = realloc(png_data->idat_data, idat_capacity);
+                if (!new_idat_data) {
+                    fprintf(stderr, "ERROR: Could not reallocate memory for IDAT\n");
+                    free(png_data->idat_data);
+                    fclose(input_fp);
+                    return false;
+                }
+                png_data->idat_data = new_idat_data;
+            }
+            read_bytes(input_fp, png_data->idat_data + png_data->idat_size, chunk_size);
+            png_data->idat_size += chunk_size;
+        } else if (memcmp(chunk_type, "IEND", 4) == 0) {
+            quit = true;
+        } else {
+            fseek(input_fp, chunk_size, SEEK_CUR);
+        }
+
+        read_chunk_crc(input_fp);
+    }
+
+    fclose(input_fp);
+    return true;
+}
+
+void free_png_data(png_data_t *png_data) {
+    if (png_data->palette.entries) {
+        free(png_data->palette.entries);
+        png_data->palette.entries = NULL;
+    }
+    if (png_data->palette.alphas) {
+        free(png_data->palette.alphas);
+        png_data->palette.alphas = NULL;
+    }
+    if (png_data->idat_data) {
+        free(png_data->idat_data);
+        png_data->idat_data = NULL;
+    }
+}
+
 void print_info(FILE *file, char *filename) {
     rewind(file);
     fseek(file, 0, SEEK_END);

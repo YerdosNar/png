@@ -12,16 +12,6 @@
 #include "png_io.h"
 
 typedef struct {
-    uint32_t width;
-    uint32_t height;
-    uint8_t bit_depth;
-    uint8_t color_type;
-    uint8_t compression;
-    uint8_t filter;
-    uint8_t interlace;
-} ihdr_t;
-
-typedef struct {
     uint8_t **pixels;
     uint32_t width;
     uint32_t height;
