@@ -17,11 +17,13 @@ void usage(char *exec_name) {
     printf("  -l,  --laplacian            Apply Laplacian edge detection\n");
     printf("  -sh, --sharpen              Apply sharpening filter\n");
     printf("  -u,  --upscale              Upscale the image\n");
+    printf("  -d,  --draw [color]         Draw the input image in ASCII characters (default: color=true)\n");
     printf("  --none                      No filter (default)\n");
     printf("  -h, --help                  Show this HELP message\n");
     printf("\nExamples:\n");
     printf("  %s input.png -o edges.png --sobel --grayscale\n", exec_name);
     printf("  %s photo.png -o blurred.png --gaussian\n", exec_name);
+    printf("  %s photo.png -o blurred.png --draw false\n", exec_name);
 
     printf("\n\n");
     printf("Author: YerdosNar github.com/YerdosNar/PNG.git\n");
