@@ -13,6 +13,8 @@ typedef struct {
     char *output_file;
     bool force_grayscale;
     bool do_upscale;
+    bool draw;
+    bool draw_color;
     kernel_type kernel;
     uint8_t steps;
     float scale_factor;
@@ -33,5 +35,8 @@ int handle_steg_command(int argc, char **argv);
 
 // Handle info command
 int handle_info_command(const char *filename);
+
+// Handle draw command
+int handle_draw_command(const char *filename, bool color);
 
 #endif

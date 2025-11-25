@@ -175,7 +175,7 @@ void save_png(const char *filename, uint8_t **pixels,
 bool read_png_file(const char *filename, png_data_t *png_data) {
     // Initialize png_data structure
     memset(png_data, 0, sizeof(png_data_t));
-    
+
     FILE *input_fp = fopen(filename, "rb");
     if (!input_fp) {
         fprintf(stderr, "ERROR: Could not open input file %s\n", filename);
@@ -396,5 +396,14 @@ void print_info(FILE *file, char *filename) {
         }
 
         read_chunk_crc(file);
+    }
+}
+
+void draw_ascii(FILE *file, bool color) {
+    if(color) {
+        printf("Draw handling in PNG_IO color\n");
+    }
+    else {
+        printf("Draw handling in PNG_IO no color\n");
     }
 }
