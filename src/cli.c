@@ -280,7 +280,7 @@ int handle_draw_command(const char *filename, bool color) {
         return 1;
     }
     printf("handling DRAW command\n");
-    draw_ascii(file, color);
+    draw_ascii(filename, color);
     return 0;
 }
 

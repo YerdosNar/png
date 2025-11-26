@@ -1,5 +1,9 @@
-#include "../include/processor.h"
 #include "../include/png_io.h"
+#include <asm-generic/ioctls.h>
+#include <sys/ioctl.h>
+
+#define STB_IMAGE_IMPLEMENTATION
+#include "../include/stb_image.h"
 
 const uint8_t png_sig[PNG_SIG_SIZE] = {137, 80, 78, 71, 13, 10, 26, 10};
 
@@ -351,22 +355,6 @@ void print_info(FILE *file, char *filename) {
             printf("||    %-12s : %u%-19s||\n", "Filter", ihdr.filter, "");
             printf("||    %-12s : %u%-19s||\n", "Interlace", ihdr.interlace, "");
         }
-        // else if(memcmp(chunk_type, "tEXt", 4) == 0) {
-        //     uint8_t *text_data = malloc(chunk_size + 1);
-        //     if(text_data) {
-        //         read_bytes(file, text_data, chunk_size);
-        //         text_data[chunk_size] = '\0';
-        //
-        //         char *keyword = (char*)text_data;
-        //         char *text = keyword + strlen(keyword) + 1;
-        //         if(text < (char*)text_data + chunk_size) {
-        //             printf("||  Text: %s = %s\n", keyword, text);
-        //         }
-        //         free(text_data);
-        //     } else {
-        //         fseek(file, chunk_size, SEEK_CUR);
-        //     }
-        // }
         else if((memcmp(chunk_type, "PLTE", 4) == 0) ||
                 (memcmp(chunk_type, "tRNS", 4) == 0) ||
                 (memcmp(chunk_type, "pHYs", 4) == 0) ||
@@ -399,11 +387,63 @@ void print_info(FILE *file, char *filename) {
     }
 }
 
-void draw_ascii(FILE *file, bool color) {
-    if(color) {
-        printf("Draw handling in PNG_IO color\n");
+void draw_ascii(char *filename, bool color) {
+    const char *ASCII_CHARS = "$@B%8&WM#*oahkbdpqwmZO0QLCJUYXzcvunxrjft/\\|()1{}[]?-_+~<>i!lI;:,\"^`'. ";
+    struct winsize w;
+    ioctl(0, TIOCGWINSZ, &w);
+    int target_width = w.ws_col;
+    if(target_width < 100) {
+        fprintf(stderr, "ERROR: Width cannot be less than 100 chars\n");
+        return;
     }
-    else {
-        printf("Draw handling in PNG_IO no color\n");
+
+    int width, height, channels;
+    uint8_t *img = stbi_load(filename, &width, &height, &channels, 0);
+
+    if(img == NULL) {
+        fprintf(stderr, "ERROR: Could NOT load image: %s\n", filename);
+        return;
     }
+
+    double aspect_ratio = (double)height / width;
+    int target_height = (int32_t)(target_width * aspect_ratio * 0.55); // 0.55 ratio of fonts in terminal
+
+    double step_x = (double)width / target_width;
+    double step_y = (double)height / target_height;
+
+    int map_len = 0;
+    while(ASCII_CHARS[map_len] != '\0') map_len++;
+
+    for(int y = 0; y < target_height; y++) {
+        for(int x = 0; x < target_width; x++) {
+            int src_x = (int32_t)(x * step_x);
+            int src_y = (int32_t)(y * step_y);
+
+            if(src_x >= width) src_x = width - 1;
+            if(src_y >= width) src_y = height -1;
+
+            uint8_t *pixel = img + (src_y * width + src_x) * channels;
+            uint8_t r = 0, g = 0, b = 0, a = 0xff;
+
+            if (channels >= 1) r = pixel[0];
+            if (channels >= 2) g = pixel[1];
+            else g = r;
+            if (channels >= 3) b = pixel[2];
+            else b = r;
+            if (channels >= 4) a = pixel[3];
+
+            if(a < 50) {
+                putchar(' ');
+                continue;
+            }
+
+            float luminance = 0.212f * r + 0.715f * g + 0.072f * b;
+
+            int char_idx = (int)((luminance / 255.0f) * (map_len - 1));
+            putchar(ASCII_CHARS[char_idx]);
+        }
+        putchar('\n');
+    }
+
+    stbi_image_free(img);
 }

@@ -51,7 +51,7 @@ void write_chunk(FILE *file, const char type[], uint8_t *data, uint32_t length_l
 
 void save_png(const char *filename, uint8_t **pixels, uint32_t width, uint32_t height, uint8_t color_type, uint32_t channels);
 void print_info(FILE *file, char *filename);
-void draw_ascii(FILE *file, bool color);
+void draw_ascii(char *filename, bool color);
 
 // Structure to hold PNG data read from file
 typedef struct {

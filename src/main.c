@@ -21,13 +21,7 @@ int main(int argc, char **argv) {
 
     // Handle draw command
     if (config.draw || config.draw_color) {
-        if (config.draw_color) {
-            printf("DRAW_COLOR\n");
-            return handle_draw_command(config.input_file, config.draw_color);
-        } else {
-            printf("DRAW_NO_COLOR\n");
-            return handle_draw_command(config.input_file, config.draw_color);
-        }
+        return handle_draw_command(config.input_file, config.draw_color);
     }
 
     // Print processing information
