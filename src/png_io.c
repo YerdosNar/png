@@ -1,5 +1,6 @@
-#include "../include/processor.h"
 #include "../include/png_io.h"
+#include "../include/processor.h"
+#include <sys/ioctl.h>
 
 const uint8_t png_sig[PNG_SIG_SIZE] = {137, 80, 78, 71, 13, 10, 26, 10};
 
@@ -175,7 +176,7 @@ void save_png(const char *filename, uint8_t **pixels,
 bool read_png_file(const char *filename, png_data_t *png_data) {
     // Initialize png_data structure
     memset(png_data, 0, sizeof(png_data_t));
-    
+
     FILE *input_fp = fopen(filename, "rb");
     if (!input_fp) {
         fprintf(stderr, "ERROR: Could not open input file %s\n", filename);
@@ -351,22 +352,6 @@ void print_info(FILE *file, char *filename) {
             printf("||    %-12s : %u%-19s||\n", "Filter", ihdr.filter, "");
             printf("||    %-12s : %u%-19s||\n", "Interlace", ihdr.interlace, "");
         }
-        // else if(memcmp(chunk_type, "tEXt", 4) == 0) {
-        //     uint8_t *text_data = malloc(chunk_size + 1);
-        //     if(text_data) {
-        //         read_bytes(file, text_data, chunk_size);
-        //         text_data[chunk_size] = '\0';
-        //
-        //         char *keyword = (char*)text_data;
-        //         char *text = keyword + strlen(keyword) + 1;
-        //         if(text < (char*)text_data + chunk_size) {
-        //             printf("||  Text: %s = %s\n", keyword, text);
-        //         }
-        //         free(text_data);
-        //     } else {
-        //         fseek(file, chunk_size, SEEK_CUR);
-        //     }
-        // }
         else if((memcmp(chunk_type, "PLTE", 4) == 0) ||
                 (memcmp(chunk_type, "tRNS", 4) == 0) ||
                 (memcmp(chunk_type, "pHYs", 4) == 0) ||
@@ -397,4 +382,107 @@ void print_info(FILE *file, char *filename) {
 
         read_chunk_crc(file);
     }
+}
+
+void draw_ascii(const char *filename, bool color) {
+    const char *ASCII_CHARS = "$@B%8&WM#*oahkbdpqwmZO0QLCJUYXzcvunxrjft/\\|()1{}[]?-_+~<>i!lI;:,\"^`'. ";
+    
+    // Get terminal size
+    struct winsize w;
+    ioctl(0, TIOCGWINSZ, &w);
+    int target_width = w.ws_col;
+    if(target_width < 100) {
+        fprintf(stderr, "ERROR: Width cannot be less than 100 chars\n");
+        return;
+    }
+
+    // Read PNG using our own infrastructure
+    png_data_t png;
+    if (!read_png_file(filename, &png)) {
+        fprintf(stderr, "ERROR: Could NOT load image: %s\n", filename);
+        return;
+    }
+
+    // Process the image data
+    image_t *image = process_idat_chunks(&png.ihdr, &png.palette, png.idat_data, png.idat_size);
+    if (!image) {
+        fprintf(stderr, "ERROR: Failed to process image data\n");
+        free_png_data(&png);
+        return;
+    }
+
+    uint32_t width = image->width;
+    uint32_t height = image->height;
+    uint32_t channels = image->channels;
+
+    // Calculate target dimensions
+    double aspect_ratio = (double)height / width;
+    int target_height = (int)(target_width * aspect_ratio * 0.55); // 0.55 adjusts for font aspect ratio
+
+    double step_x = (double)width / target_width;
+    double step_y = (double)height / target_height;
+
+    int map_len = 0;
+    while(ASCII_CHARS[map_len] != '\0') map_len++;
+
+    // Draw ASCII art
+    for(int y = 0; y < target_height; y++) {
+        for(int x = 0; x < target_width; x++) {
+            int src_x = (int)(x * step_x);
+            int src_y = (int)(y * step_y);
+
+            if(src_x >= (int)width) src_x = width - 1;
+            if(src_y >= (int)height) src_y = height - 1;
+
+            uint8_t r = 0, g = 0, b = 0, a = 0xff;
+
+            // Extract pixel values based on channel count
+            if (channels == 1) {
+                // Grayscale
+                r = g = b = image->pixels[src_y][src_x];
+            } else if (channels == 2) {
+                // Grayscale + Alpha
+                r = g = b = image->pixels[src_y][src_x * 2];
+                a = image->pixels[src_y][src_x * 2 + 1];
+            } else if (channels == 3) {
+                // RGB
+                r = image->pixels[src_y][src_x * 3];
+                g = image->pixels[src_y][src_x * 3 + 1];
+                b = image->pixels[src_y][src_x * 3 + 2];
+            } else if (channels == 4) {
+                // RGBA
+                r = image->pixels[src_y][src_x * 4];
+                g = image->pixels[src_y][src_x * 4 + 1];
+                b = image->pixels[src_y][src_x * 4 + 2];
+                a = image->pixels[src_y][src_x * 4 + 3];
+            }
+
+            // Handle transparency
+            if(a < 50) {
+                putchar(' ');
+                continue;
+            }
+
+            // Calculate luminance for character selection
+            float luminance = 0.299f * r + 0.587f * g + 0.114f * b;
+
+            if (color && channels >= 3) {
+                // Print with ANSI color codes
+                printf("\033[38;2;%d;%d;%dm", r, g, b);
+            }
+
+            int char_idx = (int)((luminance / 255.0f) * (map_len - 1));
+            putchar(ASCII_CHARS[char_idx]);
+
+            if (color && channels >= 3) {
+                printf("\033[0m"); // Reset color
+            }
+        }
+        putchar('\n');
+    }
+
+    // Cleanup
+    free_pixel_matrix(image->pixels, image->height);
+    free(image);
+    free_png_data(&png);
 }

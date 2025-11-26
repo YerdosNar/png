@@ -19,6 +19,11 @@ int main(int argc, char **argv) {
         return handle_info_command(config.input_file);
     }
 
+    // Handle draw command
+    if (config.draw || config.draw_color) {
+        return handle_draw_command(config.input_file, config.draw_color);
+    }
+
     // Print processing information
     printf("Kernel: ");
     switch (config.kernel) {

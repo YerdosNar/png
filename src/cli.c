@@ -17,11 +17,13 @@ void usage(char *exec_name) {
     printf("  -l,  --laplacian            Apply Laplacian edge detection\n");
     printf("  -sh, --sharpen              Apply sharpening filter\n");
     printf("  -u,  --upscale              Upscale the image\n");
+    printf("  -d,  --draw [color]         Draw the input image in ASCII characters (default: color=true)\n");
     printf("  --none                      No filter (default)\n");
     printf("  -h, --help                  Show this HELP message\n");
     printf("\nExamples:\n");
     printf("  %s input.png -o edges.png --sobel --grayscale\n", exec_name);
     printf("  %s photo.png -o blurred.png --gaussian\n", exec_name);
+    printf("  %s photo.png -o blurred.png --draw false\n", exec_name);
 
     printf("\n\n");
     printf("Author: YerdosNar github.com/YerdosNar/PNG.git\n");
@@ -33,6 +35,8 @@ bool parse_arguments(int argc, char **argv, cli_config_t *config) {
     config->output_file = NULL;
     config->force_grayscale = false;
     config->do_upscale = false;
+    config->draw = false;
+    config->draw_color = false;
     config->kernel = KERNEL_NONE;
     config->steps = 0;
     config->scale_factor = 0.0f;
@@ -68,6 +72,43 @@ bool parse_arguments(int argc, char **argv, cli_config_t *config) {
         if (strstr(config->input_file, ".png") == NULL) {
             fprintf(stderr, "ERROR: Input file not provided for --info\n");
             return false;
+        }
+        return true;
+    }
+
+    if (!strcmp(argv[1], "-d") || !strcmp(argv[1], "--draw")) {
+        if (argc < 3) {
+            fprintf(stderr, "ERROR: Invalid number of arguments for --draw flag\n");
+            printf("Usage: %s -d/--draw [true/false] <input.png>\n", argv[0]);
+            printf("       %s -d input.png\n", argv[0]);
+            printf("       %s -d false input.png\n", argv[0]);
+            return false;
+        }
+        if (!strcmp(argv[2], "false")) {
+            printf("Set draw=true color=false\n");
+            config->draw = true;
+            config->draw_color = false;
+            config->input_file = argv[3];
+            if (strstr(config->input_file, ".png") == NULL) {
+                fprintf(stderr, "ERROR: Input file not provided for --draw\n");
+                return false;
+            }
+        } else if (!strcmp(argv[2], "true")) {
+            config->draw = false;
+            config->draw_color = true;
+            config->input_file = argv[3];
+            if (strstr(config->input_file, ".png") == NULL) {
+                fprintf(stderr, "ERROR: Input file not provided for --draw\n");
+                return false;
+            }
+        } else {
+            config->input_file = argv[2];
+            if (strstr(config->input_file, ".png") == NULL) {
+                fprintf(stderr, "ERROR: Input file not provided for --draw\n");
+                return false;
+            }
+            config->draw = false;
+            config->draw_color = true;
         }
         return true;
     }
@@ -229,6 +270,11 @@ int handle_info_command(const char *filename) {
     }
     print_info(file, (char *)filename);
     fclose(file);
+    return 0;
+}
+
+int handle_draw_command(const char *filename, bool color) {
+    draw_ascii(filename, color);
     return 0;
 }
 
