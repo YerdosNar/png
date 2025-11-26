@@ -274,12 +274,6 @@ int handle_info_command(const char *filename) {
 }
 
 int handle_draw_command(const char *filename, bool color) {
-    FILE *file = fopen(filename, "rb");
-    if(!file) {
-        fprintf(stderr, "ERROR: Could not open file %s\n", filename);
-        return 1;
-    }
-    printf("handling DRAW command\n");
     draw_ascii(filename, color);
     return 0;
 }

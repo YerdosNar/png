@@ -1,9 +1,6 @@
 #include "../include/png_io.h"
-#include <asm-generic/ioctls.h>
+#include "../include/processor.h"
 #include <sys/ioctl.h>
-
-#define STB_IMAGE_IMPLEMENTATION
-#include "../include/stb_image.h"
 
 const uint8_t png_sig[PNG_SIG_SIZE] = {137, 80, 78, 71, 13, 10, 26, 10};
 
@@ -387,8 +384,10 @@ void print_info(FILE *file, char *filename) {
     }
 }
 
-void draw_ascii(char *filename, bool color) {
+void draw_ascii(const char *filename, bool color) {
     const char *ASCII_CHARS = "$@B%8&WM#*oahkbdpqwmZO0QLCJUYXzcvunxrjft/\\|()1{}[]?-_+~<>i!lI;:,\"^`'. ";
+    
+    // Get terminal size
     struct winsize w;
     ioctl(0, TIOCGWINSZ, &w);
     int target_width = w.ws_col;
@@ -397,16 +396,28 @@ void draw_ascii(char *filename, bool color) {
         return;
     }
 
-    int width, height, channels;
-    uint8_t *img = stbi_load(filename, &width, &height, &channels, 0);
-
-    if(img == NULL) {
+    // Read PNG using our own infrastructure
+    png_data_t png;
+    if (!read_png_file(filename, &png)) {
         fprintf(stderr, "ERROR: Could NOT load image: %s\n", filename);
         return;
     }
 
+    // Process the image data
+    image_t *image = process_idat_chunks(&png.ihdr, &png.palette, png.idat_data, png.idat_size);
+    if (!image) {
+        fprintf(stderr, "ERROR: Failed to process image data\n");
+        free_png_data(&png);
+        return;
+    }
+
+    uint32_t width = image->width;
+    uint32_t height = image->height;
+    uint32_t channels = image->channels;
+
+    // Calculate target dimensions
     double aspect_ratio = (double)height / width;
-    int target_height = (int32_t)(target_width * aspect_ratio * 0.55); // 0.55 ratio of fonts in terminal
+    int target_height = (int)(target_width * aspect_ratio * 0.55); // 0.55 adjusts for font aspect ratio
 
     double step_x = (double)width / target_width;
     double step_y = (double)height / target_height;
@@ -414,36 +425,64 @@ void draw_ascii(char *filename, bool color) {
     int map_len = 0;
     while(ASCII_CHARS[map_len] != '\0') map_len++;
 
+    // Draw ASCII art
     for(int y = 0; y < target_height; y++) {
         for(int x = 0; x < target_width; x++) {
-            int src_x = (int32_t)(x * step_x);
-            int src_y = (int32_t)(y * step_y);
+            int src_x = (int)(x * step_x);
+            int src_y = (int)(y * step_y);
 
-            if(src_x >= width) src_x = width - 1;
-            if(src_y >= width) src_y = height -1;
+            if(src_x >= (int)width) src_x = width - 1;
+            if(src_y >= (int)height) src_y = height - 1;
 
-            uint8_t *pixel = img + (src_y * width + src_x) * channels;
             uint8_t r = 0, g = 0, b = 0, a = 0xff;
 
-            if (channels >= 1) r = pixel[0];
-            if (channels >= 2) g = pixel[1];
-            else g = r;
-            if (channels >= 3) b = pixel[2];
-            else b = r;
-            if (channels >= 4) a = pixel[3];
+            // Extract pixel values based on channel count
+            if (channels == 1) {
+                // Grayscale
+                r = g = b = image->pixels[src_y][src_x];
+            } else if (channels == 2) {
+                // Grayscale + Alpha
+                r = g = b = image->pixels[src_y][src_x * 2];
+                a = image->pixels[src_y][src_x * 2 + 1];
+            } else if (channels == 3) {
+                // RGB
+                r = image->pixels[src_y][src_x * 3];
+                g = image->pixels[src_y][src_x * 3 + 1];
+                b = image->pixels[src_y][src_x * 3 + 2];
+            } else if (channels == 4) {
+                // RGBA
+                r = image->pixels[src_y][src_x * 4];
+                g = image->pixels[src_y][src_x * 4 + 1];
+                b = image->pixels[src_y][src_x * 4 + 2];
+                a = image->pixels[src_y][src_x * 4 + 3];
+            }
 
+            // Handle transparency
             if(a < 50) {
                 putchar(' ');
                 continue;
             }
 
-            float luminance = 0.212f * r + 0.715f * g + 0.072f * b;
+            // Calculate luminance for character selection
+            float luminance = 0.299f * r + 0.587f * g + 0.114f * b;
+
+            if (color && channels >= 3) {
+                // Print with ANSI color codes
+                printf("\033[38;2;%d;%d;%dm", r, g, b);
+            }
 
             int char_idx = (int)((luminance / 255.0f) * (map_len - 1));
             putchar(ASCII_CHARS[char_idx]);
+
+            if (color && channels >= 3) {
+                printf("\033[0m"); // Reset color
+            }
         }
         putchar('\n');
     }
 
-    stbi_image_free(img);
+    // Cleanup
+    free_pixel_matrix(image->pixels, image->height);
+    free(image);
+    free_png_data(&png);
 }
